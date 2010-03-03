@@ -41,9 +41,6 @@ my $npe = Net::Pcap::Easy->new(
     dev              => $device,
     filter           => 'udp and dst port 28960',
     packets_per_loop => 10,
-    bytes_to_capture => 1024,
-    timeout_in_ms    => 0,
-    promiscuous      => 0,
 
     udp_callback => sub {
         my ($npe, $ether, $ip, $udp) = @_;
