@@ -1,0 +1,59 @@
+#!perl
+use strict;
+use warnings;
+use Net::Pcap ();
+use Net::Pcap::Easy;
+use Getopt::Long ();
+use File::Spec;
+use IO::File;
+
+Getopt::Long::GetOptions(
+    'd|dev=s' => \(my $device),
+    'l|log=s' => \(my $log_file),
+);
+
+if (!$device) {
+    my %devinfo;
+    my $err;
+    my @devs = Net::Pcap::pcap_findalldevs(\%devinfo, \$err);
+    if (@devs == 1) {
+        $device = $devs[0];
+    }
+    else {
+        warn "Multiple network devices detected.  Please specify one with --dev\n";
+        for my $dev (@devs) {
+            warn "$dev : $devinfo{$dev}\n";
+        }
+        exit;
+    }
+}
+print "Monitoring device $device\n";
+
+if (!$log_file) {
+    $log_file = File::Spec->catpath((File::Spec->splitpath(__FILE__))[0,1] , 'mw2players.log');
+    print "Logging to $log_file\n";
+}
+
+open my $log_fh, '>>', $log_file;
+$log_fh->autoflush(1);
+
+my $npe = Net::Pcap::Easy->new(
+    dev              => $device,
+    filter           => 'udp and dst port 28960',
+    packets_per_loop => 10,
+    bytes_to_capture => 1024,
+    timeout_in_ms    => 0,
+    promiscuous      => 0,
+
+    udp_callback => sub {
+        my ($npe, $ether, $ip, $udp) = @_;
+        my $data = $udp->{data};
+        if ($data =~ m{\bconnect [0-9a-f]+ "\\([^"]+)"}) {
+            my $playerdata = $1;
+            my %data = split /\\/, $playerdata;
+            print {$log_fh} "$ip->{src_ip}\t$data{name}\n";
+        }
+    },
+);
+
+1 while $npe->loop;
