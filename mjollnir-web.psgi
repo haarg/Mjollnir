@@ -7,13 +7,13 @@ use Getopt::Long ();
 use File::Spec;
 
 Getopt::Long::GetOptions(
-    'l|log=s' => \(my $log_file),
+    'log=s' => \(my $log_file),
 );
 
 if (!$log_file) {
     $log_file = File::Spec->catpath((File::Spec->splitpath(__FILE__))[0,1] , 'mw2players.log');
-    print "Reading log file $log_file\n";
 }
+print "Reading log file $log_file\n";
 
 sub new {
     my $class = shift;
@@ -143,7 +143,7 @@ sub ban_ip {
 sub read_logs {
     my $self = shift;
     my $limit = shift // 16;
-    open my $fh, '<', $log_file;
+    open my $fh, '<', $self->{log_file};
     my @players;
     my %players;
     while ( my $line = <$fh> ) {
@@ -171,7 +171,7 @@ sub read_logs {
 
 package main;
 
-my $app = Mjollnir->new;
+my $app = Mjollnir->new(log_file => $log_file);
 my $handler = sub { $app->run_psgi(@_) };
 
 $handler;
