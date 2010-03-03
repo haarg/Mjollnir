@@ -6,7 +6,7 @@ Install:
     cpan Plack Net::Pcap::Easy
 
 Run:
-    plackup -l127.0.0.1:28900 mjollnir-web.psgi
+    plackup -l 127.0.0.1:28900 mjollnir-web.psgi
     perl mjollnir-monitor.pl
 
 
