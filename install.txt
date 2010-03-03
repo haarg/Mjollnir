@@ -1,6 +1,0 @@
-http://www.winpcap.org/
-http://strawberryperl.com/
-
-
-ppm install http://www.bribes.org/perl/ppm/Net-Pcap.ppd
-cpan Plack Net::Pcap::Easy
