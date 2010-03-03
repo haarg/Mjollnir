@@ -3,9 +3,10 @@ use strict;
 use warnings;
 use Net::Pcap ();
 use Net::Pcap::Easy;
-use Getopt::Long ();
+use Getopt::Long qw(:config no_auto_abbrev);
 use File::Spec;
 use IO::File;
+use Cwd ();
 
 Getopt::Long::GetOptions(
     'd|dev=s' => \(my $device),
@@ -30,7 +31,7 @@ if (!$device) {
 print "Monitoring device $device\n";
 
 if (!$log_file) {
-    $log_file = File::Spec->catpath((File::Spec->splitpath(__FILE__))[0,1] , 'mw2players.log');
+    $log_file = File::Spec->catpath((File::Spec->splitpath(Cwd::realpath(__FILE__)))[0,1] , 'mw2players.log');
     print "Logging to $log_file\n";
 }
 

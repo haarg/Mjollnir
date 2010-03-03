@@ -3,15 +3,16 @@ use strict;
 use warnings;
 
 use Plack::Request;
-use Getopt::Long ();
+use Getopt::Long qw(:config no_auto_abbrev);
 use File::Spec;
+use Cwd ();
 
 Getopt::Long::GetOptions(
     'log=s' => \(my $log_file),
 );
 
 if (!$log_file) {
-    $log_file = File::Spec->catpath((File::Spec->splitpath(__FILE__))[0,1] , 'mw2players.log');
+    $log_file = File::Spec->catpath((File::Spec->splitpath(Cwd::realpath(__FILE__)))[0,1] , 'mw2players.log');
 }
 print "Reading log file $log_file\n";
 
@@ -19,6 +20,7 @@ sub new {
     my $class = shift;
     my $self = bless {
         bans => [],
+        @_,
     }, $class;
     return $self;
 }
