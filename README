@@ -4,6 +4,16 @@ DESCRIPTION
     Bans Modern Warfare 2 players through a web interface.
 
 INSTALLATION
+    It is recommended this module is run using Strawberry Perl, available from:
+
+        http://strawberryperl.com/
+
+    A version of Net::Pcap for Windows is available at
+    http://www.bribes.org/perl/wnetpcap.html.  It can be installed on the
+    command line with the command:
+
+        ppm install http://www.bribes.org/perl/ppm/Net-Pcap.ppd
+
     To install this module, run the following commands:
 
         perl Build.PL
@@ -14,6 +24,12 @@ INSTALLATION
     Alternatively, have the CPAN client install it:
 
         cpan .
+
+    Additionally, this module needs WinPcap and Microsoft's ipseccmd.exe
+    utility.
+        WinPcap     : http://www.winpcap.org/
+        ipseccmd    : http://support.microsoft.com/kb/838079
+                      (Windows XP SP2 Support Tools - Complete Install)
 
 AUTHOR
     Graham Knop <haarg@haarg.org>
