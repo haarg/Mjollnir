@@ -1,0 +1,25 @@
+[%- IF param.ip -%]
+    <h2>Banning IP [% param.ip %] ([% ban_data.names.join(", ") %])</h2>
+[%- ELSE -%]
+    <h2>Banning ID [% param.id %] ([% ban_data.names.join(", ") %], [% ban_data.ips.join(", ") %])</h2>
+    [%- END -%]
+[%- IF param.confirm -%]
+    [%- IF ban_data.result -%]
+        <h3>Ban complete.</h3>
+    [%- ELSE -%]
+        <h3 class="error">Error.</h3>
+    [%- END -%]
+[%- ELSE -%]
+    <div>
+        <h3>Are you sure you want to proceed with this ban?</h3>
+        <form method="post" action="[% post_uri %]" style="display: inline">
+            <input type="hidden" name="op" value="ban" />
+            [% IF param.id %]<input type="hidden" name="id" value="[% param.id %]" />[% END %]
+            [% IF param.ip %]<input type="hidden" name="ip" value="[% param.ip %]" />[% END %]
+            <input type="submit" name="confirm" value="Confirm Ban" />
+        </form>
+        <form method="get" style="display: inline">
+            <input type="submit" value="Cancel" />
+        </form>
+    </div>
+[%- END -%]

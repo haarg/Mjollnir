@@ -10,22 +10,30 @@ use POE::Kernel;
 use POE::Component::Server::PSGI;
 use Mjollnir::Monitor;
 use Mjollnir::Web;
-#use Mjollnir::DB;
+use Mjollnir::DB;
 
 sub create {
     my $class = shift;
     my $device = shift;
 
     return POE::Session->create(
-        inline_states => {
-            _start          => \&_start,
-            player_connect  => \&player_connect,
-            player_join     => \&player_join,
-            player_ident    => \&player_ident,
-            request         => \&request,
-            get_players     => \&get_players,
-            ban_ip          => \&ban_ip,
-        },
+        package_states => [
+            $class => [qw(
+                _start
+                player_join
+                player_ident
+                get_players
+                ban_ip
+                ban_id
+                reload_bans
+                get_id_for_ip
+                get_names_for_id
+                get_ips_for_id
+            )],
+            $class => {
+                player_connect => 'player_join',
+            },
+        ],
         args => [$device],
     );
 }
@@ -40,58 +48,67 @@ sub _start {
         host => '127.0.0.1',
         port => 28900,
     );
-    $heap->{players} = [];
+    $heap->{db} = Mjollnir::DB->new;
     $server->register_service(sub { $web->run_psgi(@_) });
+    
+    $kernel->yield('reload_bans');
 }
 
 sub ban_ip {
-    my ($kernel, $heap, $ip) = @_[KERNEL, HEAP, ARG0];
-
+    my ($kernel, $heap, $ip, $id) = @_[KERNEL, HEAP, ARG0, ARG1];
+    $heap->{db}->add_ip_ban($ip, $id);
     `ipseccmd -n BLOCK -f $ip+0:28960:UDP`;
+    return 1;
 }
 
-sub add_player {
-    my ($players, $ip, $name) = @_;
-    my %players = map { $_->{name} => $_->{ip} } @$players;
-    if ($players{$name}) {
-        for my $i (0..$#$players) {
-            my $player = $players->[$i];
-            if ($player->{name} eq $name) {
-                splice @$players, $i, 1;
-                last;
-            }
-        }
-    }
-    elsif (@$players >= 16) {
-        my $oldest_player = pop @$players;
-        delete $players{$oldest_player->{name}};
-    }
-    unshift @$players, {name => $name, ip => $ip};
-    $players{$name} = 1;
-}
-
-
-sub player_connect {
-    my ($kernel, $heap, $data) = @_[KERNEL, HEAP, ARG0];
-    add_player($heap->{players}, $data->{ip}, $data->{name});
-    print "connected $data->{ip} $data->{steam_id} $data->{name}\n";
+sub ban_id {
+    my ($kernel, $heap, $id) = @_[KERNEL, HEAP, ARG0];
+    $heap->{db}->add_id_ban($id);
+    my $ips = $heap->{db}->get_ips($id);
+    $kernel->yield(ban_ip => $_, $id)
+        for @$ips;
+    return 1;
 }
 
 sub player_join {
     my ($kernel, $heap, $data) = @_[KERNEL, HEAP, ARG0];
-    add_player($heap->{players}, $data->{ip}, $data->{name});
-    print "joined $data->{ip} $data->{steam_id} $data->{name}\n";
+    $heap->{db}->add_name($data->{steam_id}, $data->{name});
+    $heap->{db}->add_ip($data->{steam_id}, $data->{ip});
+    if ( $heap->{db}->check_banned_id($data->{id}) ) {
+        $kernel->yield(ban_ip => $data->{ip});
+    }
+    print "join\t$data->{steam_id}\t$data->{ip}\t$data->{name}\n";
 }
 
 sub player_ident {
     my ($kernel, $heap, $data) = @_[KERNEL, HEAP, ARG0];
-    add_player($heap->{players}, $data->{ip}, $data->{name});
-    print "ident $data->{ip} $data->{name}\n";
+    my $id = $heap->{db}->get_id_for_ip($data->{id});
+    $heap->{db}->add_name($id, $data->{name});
+    print "ident\t$id\t$data->{ip}\t$data->{name}\n";
 }
 
 sub get_players {
     my ($kernel, $heap) = @_[KERNEL, HEAP];
-    return $heap->{players};
+    return $heap->{db}->get_latest_players;
+}
+
+sub get_id_for_ip {
+    my ($kernel, $heap, $ip) = @_[KERNEL, HEAP, ARG0];
+    return $heap->{db}->get_id_for_ip($ip);
+}
+
+sub get_names_for_id {
+    my ($kernel, $heap, $id) = @_[KERNEL, HEAP, ARG0];
+    return $heap->{db}->get_names($id);
+}
+
+sub get_ips_for_id {
+    my ($kernel, $heap, $id) = @_[KERNEL, HEAP, ARG0];
+    return $heap->{db}->get_ips($id);
+}
+
+sub reload_bans {
+    my ($kernel, $heap) = @_[KERNEL, HEAP];
 }
 
 sub run {

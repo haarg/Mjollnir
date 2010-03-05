@@ -1,0 +1,27 @@
+<table class="player-list" cellspacing="0" cellpadding="0">
+    <thead>
+        <tr><th class="col-icon"></th><th class="col-player">Player</th><th class="col-ip">IP</th><th class="col-control">Control</th></tr>
+    </thead>
+    <tbody>
+[%- FOREACH player IN player_list -%]
+        <tr class="[% IF player.banned_id %]banned id-banned[% ELSIF player.banned_ip %]banned ip-banned[% END %]">
+            <td class="col-icon">[% IF player.banned_id %]X[% ELSIF player.banned_ip %]*[% END %]</th>
+            <td class="col-player">[% player.name %]</td>
+            <td class="col-ip">[% player.ip %]</th>
+            <td class="col-control">[% INCLUDE ban_button id = player.steam_id %][% INCLUDE ban_button ip = player.ip %]</td>
+        </tr>
+[%- END -%]
+    </tbody>
+</table>
+
+[%- BLOCK ban_button -%]
+<form method="get" class="ban-button">
+    <input type="hidden" name="op" value="ban" />
+[%- IF ip -%]
+    <input type="hidden" name="ip" value="[% ip %]" />
+[%- ELSE -%]
+    <input type="hidden" name="id" value="[% id %]" />
+[%- END -%]
+    <input type="submit" value="Ban [% IF ip ; "IP" ; ELSE ; "ID" ; END %]" />
+</form>
+[%- END -%]
