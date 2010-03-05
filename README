@@ -1,14 +1,24 @@
-Install:
-    http://www.winpcap.org/
-    http://strawberryperl.com/
+Mjollnir is Copyright (c) 2010, Graham Knop.
+ 
+DESCRIPTION
+    Bans Modern Warfare 2 players through a web interface.
 
-    ppm install http://www.bribes.org/perl/ppm/Net-Pcap.ppd
-    cpan Plack Net::Pcap::Easy
+INSTALLATION
+    To install this module, run the following commands:
 
-Run:
-    perl mjollnir-monitor.pl
-    plackup -l 127.0.0.1:28900 mjollnir-web.psgi
+        perl Build.PL
+        ./Build
+        ./Build test
+        ./Build install
 
+    Alternatively, have the CPAN client install it:
 
-Browse:
-    http://127.0.0.1:28900
+        cpan .
+
+AUTHOR
+    Graham Knop <haarg@haarg.org>
+
+LICENSE INFORMATION
+    This library is free software; you can redistribute it and/or
+    modify it under the same terms as Perl 5.10.0. For more details,
+    see the full text of the licenses in the directory LICENSES.

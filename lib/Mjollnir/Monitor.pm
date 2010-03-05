@@ -1,6 +1,10 @@
 package Mjollnir::Monitor;
 use strict;
 use warnings;
+use 5.010;
+
+our $VERSION = 0.01;
+
 use POE;
 use POE::Session;
 use POE::Kernel;
@@ -23,12 +27,10 @@ sub spawn {
     return POE::Session->create(
         inline_states => {
             _start => \&_start,
-            shutdown => \&_shutdown,
-            poll => \&_poll,
+            shutdown => \&shutdown,
+            poll => \&poll,
             got_packet => \&got_packet,
-            connect => \&connect,
-            member_join => \&member_join,
-            ident => \&ident,
+            set_listener => \&set_listener,
         },
         heap => {
             device => $device,
@@ -37,12 +39,14 @@ sub spawn {
 }
 
 sub _start {
-    my ($kernel, $heap) = @_[KERNEL, HEAP];
+    my ($kernel, $heap, $listener) = @_[KERNEL, HEAP, ARG0];
+    $heap->{target_session} = $_[SENDER];
 
+    my $err;
     my $device = $heap->{device};
+    
     my $network_raw;
     my $mask_raw;
-    my $err;
     Net::Pcap::lookupnet($device, \$network_raw, \$mask_raw, \$err);
     $heap->{network_raw} = $network_raw;
     $heap->{mask_raw} = $mask_raw;
@@ -50,6 +54,7 @@ sub _start {
     my $mask = $heap->{mask} = 32 - log(2**32 - $mask_raw) / log 2;
 
     my $pcap = $heap->{pcap} = Net::Pcap::open_live($device, 10, 0, 0, \$err);
+
     my $filter;
     Net::Pcap::compile($pcap, \$filter, "udp and dst port 28960 and dst net $network/mask", 0, $mask_raw);
     Net::Pcap::setfilter($pcap, $filter);
@@ -57,7 +62,7 @@ sub _start {
     $heap->{timer} = $kernel->delay_set( 'poll', 0.5 );
 }
 
-sub _poll {
+sub poll {
     my ($kernel, $heap) = @_[KERNEL, HEAP];
     Net::Pcap::dispatch($heap->{pcap}, -1, sub {
         my (undef, $header, $packet) = @_;
@@ -66,9 +71,8 @@ sub _poll {
     $heap->{timer} = $kernel->delay_set( 'poll', 0.5 );
 }
 
-sub _shutdown {
+sub shutdown {
     my ($kernel, $heap) = @_[KERNEL, HEAP];
-    warn "asdasd\n";
 }
 
 sub got_packet {
@@ -82,36 +86,53 @@ sub got_packet {
     my $udp = NetPacket::UDP->decode($ip->{data});
     my $data = $udp->{data};
     return unless $data;
-    if ($data =~ m{\bconnect [0-9a-f]+ "\\([^"]+)"}) {
+    if ($data =~ m{^\xff{4}connect [0-9a-f]+ "\\([^"]+)"}) {
         my $playerdata = $1;
         my %data = split /\\/, $playerdata;
-        $kernel->yield( 'connect', $ip->{src_ip}, \%data );
+        $kernel->post( $heap->{target_session}, 'player_connect', {
+            ip       => $ip->{src_ip},
+            name     => $data{name},
+            steam_id => $data{steamid},
+        } );
     }
-    elsif ($data =~ /^\xff{4}0memberJoin [^ ]* ([0-9a-f]{8})([0-9a-f]{8})/) {
+    elsif ($data =~ /^\xff{4}\dmemberJoin [^ ]* ([0-9a-f]{8})([0-9a-f]{8}) \w+\x00.{44}([^\x00]+)/) {
         my $steam_id = $2 . $1;
-        $kernel->yield( 'member_join', $ip->{src_ip}, $steam_id );
+        my $player_name = $3;
+        $kernel->post( $heap->{target_session}, 'player_join', {
+            ip       => $ip->{src_ip},
+            name     => $player_name,
+            steam_id => $steam_id,
+        } );
     }
-    elsif ($data =~ /^\xff{4}0ident\x00([^\x00]+)/) {
+    elsif ($data =~ /^\xff{4}\dident\x00([^\x00]+)/) {
         my $player_name = $1;
-        $kernel->yield( 'ident', $ip->{src_ip}, $player_name );
+        $kernel->post( $heap->{target_session}, 'player_ident', {
+            ip       => $ip->{src_ip},
+            name     => $player_name,
+        } );
     }
 #    elsif ($data =~ /partystate/) {
 #    }
 }
 
-sub connect {
-    my ($kernel, $heap, $ip, $data) = @_[KERNEL, HEAP, ARG0, ARG1];
-    print "connected $ip $data->{steamid} $data->{name} \n";
-}
-
-sub member_join {
-    my ($kernel, $heap, $ip, $steam_id) = @_[KERNEL, HEAP, ARG0, ARG1];
-    print "joined $ip $steam_id\n";
-}
-
-sub ident {
-    my ($kernel, $heap, $ip, $player_name) = @_[KERNEL, HEAP, ARG0, ARG1];
-    print "ident $ip $player_name\n";
-}
-
 1;
+
+__END__
+
+=head1 NAME
+
+Mjollnir::Web - Web interface for Mjollnir
+
+=head1 AUTHOR
+
+Graham Knop <haarg@haarg.org>
+
+=head1 LICENSE
+
+Copyright (c) 2010, Graham Knop
+ 
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl 5.10.0. For more details, see the
+full text of the licenses in the directory LICENSES.
+
+=cut
