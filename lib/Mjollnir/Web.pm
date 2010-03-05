@@ -12,14 +12,16 @@ use File::ShareDir ();
 use File::Spec;
 
 sub new {
-    my $class = shift;
-    my $manager = shift;
+    my $class    = shift;
+    my $manager  = shift;
     my $template = Template->new(
-        INCLUDE_PATH => File::Spec->catdir(File::ShareDir::dist_dir('Mjollnir'), 'templates'),
+        INCLUDE_PATH => File::Spec->catdir(
+            File::ShareDir::dist_dir('Mjollnir'), 'templates'
+        ),
         DELIMITER => ';',
     );
     my $self = bless {
-        manager => $manager,
+        manager  => $manager,
         template => $template,
     }, $class;
     return $self;
@@ -27,49 +29,48 @@ sub new {
 
 sub run_psgi {
     my $self = shift;
-    my $env = shift;
-    my $req = Plack::Request->new($env);
+    my $env  = shift;
+    my $req  = Plack::Request->new($env);
 
     return $self->www_main($req);
 }
 
 sub www_main {
     my $self = shift;
-    my $req = shift;
+    my $req  = shift;
 
     my $param = $req->parameters;
-    my $vars = {
-        param => $param,
-    };
-    if ($param->{op} && $param->{op} eq 'ban') {
+    my $vars = { param => $param, };
+    if ( $param->{op} && $param->{op} eq 'ban' ) {
         my $ban_data = $vars->{ban_data} = {};
-        if (my $ip = $param->{ip}) {
+        if ( my $ip = $param->{ip} ) {
             $ban_data->{ips} = [ $param->get_one('ip') ];
-            my $id = $self->call('get_id_for_ip', $ip);
-            $ban_data->{names} = $self->call('get_names_for_id', $id);
-            if ($param->{confirm}) {
-                $ban_data->{result} = $self->call(ban_ip => $param->get_one('ip'));
+            my $id = $self->call( 'get_id_for_ip', $ip );
+            $ban_data->{names} = $self->call( 'get_names_for_id', $id );
+            if ( $param->{confirm} ) {
+                $ban_data->{result}
+                    = $self->call( ban_ip => $param->get_one('ip') );
             }
         }
-        elsif (my $id = $param->{id}) {
-            $ban_data->{id} = $id;
-            $ban_data->{ips} = $self->call('get_ips_for_id', $id);
-            $ban_data->{names} = $self->call('get_names_for_id', $id);
-            if ($param->{confirm}) {
-                $ban_data->{result} = $self->call(ban_id => $param->{id});
+        elsif ( my $id = $param->{id} ) {
+            $ban_data->{id}    = $id;
+            $ban_data->{ips}   = $self->call( 'get_ips_for_id', $id );
+            $ban_data->{names} = $self->call( 'get_names_for_id', $id );
+            if ( $param->{confirm} ) {
+                $ban_data->{result} = $self->call( ban_id => $param->{id} );
             }
         }
     }
 
     $vars->{player_list} = $self->get_players;
-    $vars->{refresh} = $req->request_uri;
-    $vars->{post_uri} = $req->base;
+    $vars->{refresh}     = $req->request_uri;
+    $vars->{post_uri}    = $req->base;
 
     my $res = $req->new_response(200);
     $res->content_type('text/html; charset=utf-8');
 
     my $content = '';
-    $self->{template}->process('main', $vars, \$content);
+    $self->{template}->process( 'main', $vars, \$content );
 
     $res->body($content);
     return $res->finalize;
@@ -82,12 +83,12 @@ sub get_players {
 
 sub post {
     my $self = shift;
-    POE::Kernel->post($self->{manager}, @_);
+    POE::Kernel->post( $self->{manager}, @_ );
 }
 
 sub call {
     my $self = shift;
-    return POE::Kernel->call($self->{manager}, @_);
+    return POE::Kernel->call( $self->{manager}, @_ );
 }
 
 1;
