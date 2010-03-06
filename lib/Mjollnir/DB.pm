@@ -152,6 +152,26 @@ sub check_banned_ip {
     return $match;
 }
 
+sub get_ip_bans {
+    my $self = shift;
+
+    my $dbh = $self->dbh;
+    my @ips = map {@$_} @{
+        $dbh->selectall_arrayref('SELECT ip FROM ip_bans ORDER BY timestamp DESC')
+    };
+    return \@ips;
+}
+
+sub get_id_bans {
+    my $self = shift;
+
+    my $dbh = $self->dbh;
+    my @ids = map {@$_} @{
+        $dbh->selectall_arrayref('SELECT steam_id FROM id_bans ORDER BY timestamp DESC')
+    };
+    return \@ids;
+}
+
 sub add_ip_ban {
     my $self = shift;
     my $ip   = shift;

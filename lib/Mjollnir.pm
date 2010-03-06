@@ -29,9 +29,14 @@ sub create {
                     get_id_for_ip
                     get_names_for_id
                     get_ips_for_id
+                    get_id_for_ip
+                    get_ip_bans
+                    get_id_bans
+                    check_banned_ip
+                    check_banned_id
                     )
             ],
-            $class => { player_connect => 'player_join', },
+            $class => { player_connect => 'player_join' },
         ],
         args => [$device],
     );
@@ -103,6 +108,26 @@ sub get_names_for_id {
 sub get_ips_for_id {
     my ( $kernel, $heap, $id ) = @_[ KERNEL, HEAP, ARG0 ];
     return $heap->{db}->get_ips($id);
+}
+
+sub check_banned_id {
+    my ( $kernel, $heap, $id ) = @_[ KERNEL, HEAP, ARG0 ];
+    return $heap->{db}->check_banned_id($id);
+}
+
+sub check_banned_ip {
+    my ( $kernel, $heap, $ip ) = @_[ KERNEL, HEAP, ARG0 ];
+    return $heap->{db}->check_banned_ip($ip);
+}
+
+sub get_ip_bans {
+    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+    return $heap->{db}->get_ip_bans;
+}
+
+sub get_id_bans {
+    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+    return $heap->{db}->get_id_bans;
 }
 
 sub reload_bans {

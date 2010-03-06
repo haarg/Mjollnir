@@ -1,0 +1,18 @@
+[%- PROCESS header -%]
+        <h1>Mjöllnir - Player Info - [% id %]</h1>
+        [%- IF banned -%]
+        <h2>Banned by ID</h2>
+        [%- END -%]
+        <h2>Names:</h2>
+        <ul>
+        [%- FOREACH name IN names -%]
+            <li>[% name %]</li>
+        [%- END -%]
+        </ul>
+        <h2>IPs:</h2>
+        <ul>
+        [%- FOREACH ip IN ips -%]
+            <li>[% ip.ip %][% IF ip.banned; " - Banned"; END %]</li>
+        [%- END -%]
+        </ul>
+[%- PROCESS footer -%]

@@ -32,7 +32,17 @@ sub run_psgi {
     my $env  = shift;
     my $req  = Plack::Request->new($env);
 
-    return $self->www_main($req);
+    my $path_info = $req->path_info;
+    my (undef, $command, $data) = split m{/}, $path_info, 3;
+    
+    if ($command eq '') {
+        return $self->www_main($req);
+    }
+    my $call_method = 'www_' . $command;
+    if ($self->can($call_method)) {
+        return $self->$call_method($req, $data);
+    }
+    return [404, ['Content-Type' => 'text/plain'], ['not found']];
 }
 
 sub www_main {
@@ -40,7 +50,7 @@ sub www_main {
     my $req  = shift;
 
     my $param = $req->parameters;
-    my $vars = { param => $param, };
+    my $vars = { param => $param };
     if ( $param->{op} && $param->{op} eq 'ban' ) {
         my $ban_data = $vars->{ban_data} = {};
         if ( my $ip = $param->{ip} ) {
@@ -71,6 +81,49 @@ sub www_main {
 
     my $content = '';
     $self->{template}->process( 'main', $vars, \$content );
+
+    $res->body($content);
+    return $res->finalize;
+}
+
+sub www_player {
+    my $self = shift;
+    my $req  = shift;
+    my $player = shift;
+
+    my $res = $req->new_response(200);
+    $res->content_type('text/html; charset=utf-8');
+
+    my $vars = {
+        id      => $player,
+        ips     => [ map { {
+            ip      => $_,
+            banned  => $self->call('checked_banned_ip' => $_),
+        } } @{ $self->call('get_ips_for_id' => $player) } ],
+        names   => $self->call('get_names_for_id' => $player),
+        banned  => $self->call('check_banned_id' => $player),
+    };
+    my $content = '';
+    $self->{template}->process( 'player', $vars, \$content );
+
+    $res->body($content);
+    return $res->finalize;
+}
+
+sub www_bans {
+    my $self = shift;
+    my $req  = shift;
+
+    my $param = $req->parameters;
+    my $res = $req->new_response(200);
+    $res->content_type('text/html; charset=utf-8');
+
+    my $vars = {
+        ips     => $self->call('get_ip_bans'),
+        ids     => $self->call('get_id_bans'),
+    };
+    my $content = '';
+    $self->{template}->process( 'bans', $vars, \$content );
 
     $res->body($content);
     return $res->finalize;

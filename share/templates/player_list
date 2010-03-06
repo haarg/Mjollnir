@@ -6,7 +6,7 @@
 [%- FOREACH player IN player_list -%]
         <tr class="[% IF player.banned_id %]banned id-banned[% ELSIF player.banned_ip %]banned ip-banned[% END %]">
             <td class="col-icon">[% IF player.banned_id %]X[% ELSIF player.banned_ip %]*[% END %]</th>
-            <td class="col-player">[% player.name %]</td>
+            <td class="col-player"><a href="/player/[% player.steam_id %]">[% player.name %]</a></td>
             <td class="col-ip">[% player.ip %]</th>
             <td class="col-control">[% INCLUDE ban_button id = player.steam_id %][% INCLUDE ban_button ip = player.ip %]</td>
         </tr>

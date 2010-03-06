@@ -1,39 +1,4 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-    <head>
-        <title>Mjollnir Web</title>
-    </head>
-    <style type="text/css">
-        .banned * {
-            text-decoration: line-through;
-        }
-        form.ban-button {
-            display: inline;
-        }
-        .player-list {
-            width: 700px;
-        }
-        .player-list th {
-            border-bottom: 2px solid #000;
-        }
-        .player-list td {
-            border-bottom: 1px solid #000;
-        }
-        .col-icon {
-            width: 20px;
-        }
-        .col-ip {
-            width: 100px;
-        }
-        .col-player {
-            width: auto;
-        }
-        .col-control {
-            width: 150px;
-            text-align: center;
-        }
-    </style>
-    <body>
+[%- PROCESS header -%]
         <h1>Mjöllnir</h1>
     [%- IF param.op == "ban"; PROCESS ban_header; END -%]
     [%- PROCESS player_list -%]
@@ -44,5 +9,4 @@
             }, 20000);
         </script>
     [%- END -%]
-    </body>
-</html>
+[%- PROCESS footer -%]
