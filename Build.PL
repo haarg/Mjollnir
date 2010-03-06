@@ -12,7 +12,7 @@ my $build = Module::Build->new(
         'Socket'                        => 0,
         'NetPacket'                     => 0,
         'DBI'                           => 0,
-        'DBD:SQLite'                    => 0,
+        'DBD::SQLite'                   => 0,
         'Plack::Request'                => 0,
         'POE::Component::Server::PSGI'  => 0,
     },

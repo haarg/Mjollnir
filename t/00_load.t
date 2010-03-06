@@ -32,6 +32,7 @@ sub find_modules {
                 return
                     unless $File::Find::name =~ /\.pm$/;
                 my $lib = File::Spec->abs2rel( $File::Find::name, $lib_dir );
+                $lib = join '/', File::Spec->splitdir($lib);
                 push @modules, $lib;
             },
         },
