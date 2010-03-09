@@ -5,11 +5,45 @@ use 5.010;
 
 our $VERSION = 0.01;
 
+use POE;
 use POE::Kernel;
 use Plack::Request;
 use Template;
 use File::ShareDir ();
 use File::Spec;
+use POE::Component::Server::PSGI;
+
+sub spawn {
+    my $class = shift;
+    my $listen = shift // '127.0.0.1:28900';
+
+    return POE::Session->create(
+        args => [ $listen ],
+        inline_states => {
+            _start => sub {
+                my ( $heap, $parent, $listen ) = @_[HEAP, SENDER, ARG0];
+                my $web = $class->new( $parent->ID );
+                my ($host, $port) = split /:/, $listen;
+                my $server = POE::Component::Server::PSGI->new(
+                    host => $host,
+                    port => $port,
+                );
+                open my $olderr, '>&', STDERR;
+                open STDERR, '>', File::Spec->devnull;
+                $heap->{web_session} = $server->register_service( sub { $web->run_psgi(@_) } );
+                open STDERR, '>&', $olderr;
+                close $olderr;
+                print "Listening for HTTP connections:\n\t$listen\n";
+            },
+            shutdown => sub {
+                my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+                $kernel->post(delete $heap->{web_session}, 'shutdown');
+                print "Stopping web server.\n";
+                return 1;
+            },
+        },
+    );
+}
 
 sub new {
     my $class    = shift;

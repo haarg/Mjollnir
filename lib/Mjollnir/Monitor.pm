@@ -21,10 +21,19 @@ sub get_devices {
     return %devinfo;
 }
 
+sub detect_default_device {
+    eval { require Mjollnir::NetInfo }
+        or die "Unable to detect network info.\n";
+    my $ip = Mjollnir::NetInfo::get_local_ip();
+    my $device = Mjollnir::NetInfo::get_device_for_ip($ip);
+    return $device;
+}
+
 sub spawn {
     my $class  = shift;
-    my $device = shift;
+    my $device = shift // detect_default_device();
     return POE::Session->create(
+        heap => { device => $device },
         package_states => [
             $class => [qw(
                 _start
@@ -33,13 +42,12 @@ sub spawn {
                 got_packet
             )],
         ],
-        heap => { device => $device },
     );
 }
 
 sub _start {
     my ( $kernel, $heap, $listener ) = @_[ KERNEL, HEAP, ARG0 ];
-    $heap->{target_session} = $_[SENDER];
+    $heap->{target_session} = $_[SENDER]->ID;
 
     my $err;
     my $device = $heap->{device};
@@ -61,8 +69,20 @@ sub _start {
         "udp and dst port 28960 and dst net $network/mask",
         0, $mask_raw );
     Net::Pcap::setfilter( $pcap, $filter );
+    $heap->{filter} = $filter;
 
     $heap->{timer} = $kernel->delay_set( 'poll', 0.5 );
+    print "Monitoring network device:\n\t$device\n";
+}
+
+sub shutdown {
+    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+    $kernel->alarm_remove(delete $heap->{timer});
+    Net::Pcap::close(delete $heap->{pcap});
+    Net::Pcap::freecode(delete $heap->{filter});
+    delete $heap->{target_session};
+    print "Stopping network monitor.\n";
+    return 1;
 }
 
 sub poll {
@@ -77,10 +97,6 @@ sub poll {
         1
     );
     $heap->{timer} = $kernel->delay_set( 'poll', 0.5 );
-}
-
-sub shutdown {
-    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
 }
 
 sub got_packet {

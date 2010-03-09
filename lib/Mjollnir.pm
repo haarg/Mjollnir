@@ -7,19 +7,21 @@ our $VERSION = 0.01;
 
 use POE;
 use POE::Kernel;
-use POE::Component::Server::PSGI;
 use Mjollnir::Monitor;
+use Mjollnir::LogMonitor;
 use Mjollnir::Web;
 use Mjollnir::DB;
+use Mjollnir::IPBan;
 
 sub create {
     my $class  = shift;
-    my $device = shift;
 
     return POE::Session->create(
         package_states => [
             $class => [ qw(
                     _start
+                    shutdown
+                    exit_signal
                     player_join
                     player_ident
                     get_players
@@ -38,24 +40,36 @@ sub create {
             ],
             $class => { player_connect => 'player_join' },
         ],
-        args => [$device],
+        args => [@_],
     );
 }
 
 sub _start {
-    my ( $kernel, $heap, $device ) = @_[ KERNEL, HEAP, ARG0 ];
+    my ( $kernel, $heap, %config ) = @_[ KERNEL, HEAP, ARG0..$#_ ];
+    $heap->{db}             = Mjollnir::DB->new;
 
-    my $monitor = Mjollnir::Monitor->spawn($device);
-    my $web     = Mjollnir::Web->new( $_[SESSION] );
+    $heap->{log_monitor}    = Mjollnir::LogMonitor->spawn($config{log_file});
+    $heap->{net_monitor}    = Mjollnir::Monitor->spawn($config{device});
+    $heap->{web_server}     = Mjollnir::Web->spawn($config{listen});
 
-    my $server = POE::Component::Server::PSGI->new(
-        host => '127.0.0.1',
-        port => 28900,
-    );
-    $heap->{db} = Mjollnir::DB->new;
-    $server->register_service( sub { $web->run_psgi(@_) } );
+    $kernel->sig($_, 'exit_signal')
+        for qw(INT QUIT TERM HUP);
+}
 
-    $kernel->yield('reload_bans');
+sub exit_signal {
+    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+    $kernel->sig_handled;
+    $kernel->sig($_)
+        for qw(INT QUIT TERM HUP);
+    $kernel->yield('shutdown');
+}
+
+sub shutdown {
+    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+    for (qw(log_monitor net_monitor web_server)) {
+        $kernel->call(delete $heap->{$_}, 'shutdown')
+    }
+    $kernel->yield('clear_active_bans');
 }
 
 sub ban_ip {
@@ -158,7 +172,7 @@ Modern Warfare 2 Ban Hammer
 
 =head1 METHODS
 
-=head2 C<run ( [ $device ] )>
+=head2 C<run>
 
 Runs Mjollnir, monitoring the given device.
 
