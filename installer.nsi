@@ -49,7 +49,7 @@ Section ""
     Pop $R5
     ${If} $R5 == "error"
         NSISdl::download http://strawberry-perl.googlecode.com/files/strawberry-perl-5.10.1.1.msi "strawberry-perl-5.10.1.1.msi"
-        Pop $R5
+        Pop $R0
         ${If} $R0 != "success"
             Abort
         ${EndIf}
