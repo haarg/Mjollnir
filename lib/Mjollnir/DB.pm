@@ -8,6 +8,7 @@ our $VERSION = 0.01;
 use File::ShareDir ();
 use File::Spec     ();
 use DBI;
+use DBD::SQLite;
 
 sub new {
     my $class = shift;
@@ -258,50 +259,21 @@ END_SQL
 1;
 
 __END__
-'
-join: ip id name
-    check latest name for id
-        add new name/id listing or
-        update timestamp
-    check latest ip for id
-        add new name/id listing or
-        update timestamp
-    banned id?
-        add ip+id ban
 
-ident
-    find id for ip
-    check latest name for id
-        add new name/id listing or
-        update timestamp
+=head1 NAME
 
--- web ---------
-ban by id:
-    add ban for ip address
-    store id
+Mjollnir::DB - Database storage for Mjollnir
 
-ban by ip
-    add ban for ip address
+=head1 AUTHOR
 
-get player list
-    get latest players by id
-    check bans against ips
-    check bans against ids
+Graham Knop <haarg@haarg.org>
 
-get player info
-    get bans for id
-    get names for id
-    get ips for id
+=head1 LICENSE
 
-unban ip
-    remove ip ban listing
-    wipe bans
-    add bans for ips
+Copyright (c) 2010, Graham Knop
+ 
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl 5.10.0. For more details, see the
+full text of the licenses in the directory LICENSES.
 
-unban id
-    remove id ban listing
-    remove id associated ip ban listings
-    wipe bans
-    add bans for ips
-
-'
+=cut
