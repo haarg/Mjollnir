@@ -61,8 +61,7 @@ sub _start {
 sub ban_ip {
     my ( $kernel, $heap, $ip, $id ) = @_[ KERNEL, HEAP, ARG0, ARG1 ];
     $heap->{db}->add_ip_ban( $ip, $id );
-    `ipseccmd -n BLOCK -f $ip+0:28960:UDP`;
-    return 1;
+    return Mjollnir::IPBan::ban_ip($ip);
 }
 
 sub ban_id {
