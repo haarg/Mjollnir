@@ -1,13 +1,14 @@
-!tempfile DISTDIRDETECT
-!system 'for /f "usebackq tokens=2" %d in (`Build.bat distdir`) do echo !define DISTDIR %d > "${DISTDIRDETECT}"'
-!include ${DISTDIRDETECT}
-!delfile ${DISTDIRDETECT}
-!undef DISTDIRDETECT
+!system 'cd .. && Build.bat distclean'
+!system 'cd .. && perl Build.PL'
+!system 'cd .. && Build.bat manifest'
+!system 'cd .. && Build.bat distdir'
+!searchparse /file ../_build/build_params "'dist_name' => '" DISTNAME "'"
+!searchparse /file ../_build/build_params "'dist_version' => '" DISTVERSION "'"
 
-!searchreplace DISTNAME "${DISTDIR}" "-" " "
+!define DISTDIR "..\${DISTNAME}-${DISTVERSION}"
 
 Name "${DISTNAME}"
-OutFile "${DISTDIR}-installer.exe"
+OutFile "${DISTNAME}-${DISTVERSION}-installer.exe"
 
 RequestExecutionLevel admin
 ShowInstDetails show

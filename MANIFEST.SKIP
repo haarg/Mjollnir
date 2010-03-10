@@ -54,4 +54,4 @@
 # Avoid archives of this distribution
 \bMjollnir-v?[\d\.\_]+
 
-^installer\.nsi$
+^installer/
