@@ -3,7 +3,7 @@ use strict;
 use warnings;
 
 BEGIN {
-    if ($^O eq 'Win32') {
+    if ($^O eq 'MSWin32') {
         require Win32;
         my (undef, $major, $minor, $build) = Win32::GetOSVersion();
         my $version = sprintf '%d.%03d', $major, $minor;
