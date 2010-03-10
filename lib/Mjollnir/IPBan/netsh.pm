@@ -36,7 +36,7 @@ __END__
 
 =head1 NAME
 
-Mjollnir::IPBans::netsh - IP banning controls using netsh
+Mjollnir::IPBan::netsh - IP banning controls using netsh
 
 =head1 AUTHOR
 

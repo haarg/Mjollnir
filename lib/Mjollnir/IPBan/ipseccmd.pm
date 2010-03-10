@@ -31,7 +31,7 @@ __END__
 
 =head1 NAME
 
-Mjollnir::IPBans::ipseccmd - IP banning controls using ipseccmd.exe
+Mjollnir::IPBan::ipseccmd - IP banning controls using ipseccmd.exe
 
 =head1 AUTHOR
 

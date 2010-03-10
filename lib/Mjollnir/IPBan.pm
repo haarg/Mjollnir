@@ -1,22 +1,24 @@
-package Mjollnir::IPBans;
+package Mjollnir::IPBan;
 use strict;
 use warnings;
 
 BEGIN {
-    require Win32;
-    my (undef, $major, $minor, $build) = Win32::GetOSVersion();
-    my $version = sprintf '%d.%03d', $major, $minor;
-    if ($version == 5.001) {
-        require Mjollnir::IPBan::ipseccmd;
-        Mjollnir::IPBans::ipseccmd->import;
+    if ($^O eq 'Win32') {
+        require Win32;
+        my (undef, $major, $minor, $build) = Win32::GetOSVersion();
+        my $version = sprintf '%d.%03d', $major, $minor;
+        if ($version == 5.001) {
+            require Mjollnir::IPBan::ipseccmd;
+            Mjollnir::IPBans::ipseccmd->import;
+            return;
+        }
+        elsif ($version > 5.001) {
+            require Mjollnir::IPBan::netsh;
+            Mjollnir::IPBans::netsh->import;
+            return;
+        }
     }
-    elsif ($version > 5.001) {
-        require Mjollnir::IPBan::netsh;
-        Mjollnir::IPBans::netsh->import;
-    }
-    else {
-        die "Unable to find implementation for IP bans.\n";
-    }
+    die "Unable to find implementation for IP bans.\n";
 }
 
 1;
@@ -25,7 +27,13 @@ __END__
 
 =head1 NAME
 
-Mjollnir::IPBans - IP banning for Mjollnir
+Mjollnir::IPBan - IP banning for Mjollnir
+
+=head1 SUBROUTINES
+
+=head2 ban_ip ( $ip )
+
+=head2 clear_bans ( )
 
 =head1 AUTHOR
 

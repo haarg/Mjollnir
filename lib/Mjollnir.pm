@@ -19,25 +19,24 @@ sub create {
     return POE::Session->create(
         package_states => [
             $class => [ qw(
-                    _start
-                    shutdown
-                    exit_signal
-                    player_join
-                    player_ident
-                    get_players
-                    ban_ip
-                    ban_id
-                    reload_bans
-                    get_id_for_ip
-                    get_names_for_id
-                    get_ips_for_id
-                    get_id_for_ip
-                    get_ip_bans
-                    get_id_bans
-                    check_banned_ip
-                    check_banned_id
-                    )
-            ],
+                _start
+                shutdown
+                exit_signal
+                player_join
+                player_ident
+                get_players
+                ban_ip
+                ban_id
+                reload_bans
+                get_id_for_ip
+                get_names_for_id
+                get_ips_for_id
+                get_id_for_ip
+                get_ip_bans
+                get_id_bans
+                check_banned_ip
+                check_banned_id
+            ) ],
             $class => { player_connect => 'player_join' },
         ],
         args => [@_],
@@ -52,22 +51,24 @@ sub _start {
     $heap->{net_monitor}    = Mjollnir::Monitor->spawn($config{device});
     $heap->{web_server}     = Mjollnir::Web->spawn($config{listen});
 
-    $kernel->sig($_, 'exit_signal')
-        for qw(INT QUIT TERM HUP);
+    for my $sig (qw(INT QUIT TERM HUP)) {
+        $kernel->sig($sig, 'exit_signal');
+    }
 }
 
 sub exit_signal {
     my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
     $kernel->sig_handled;
-    $kernel->sig($_)
-        for qw(INT QUIT TERM HUP);
+    for my $sig (qw(INT QUIT TERM HUP)) {
+        $kernel->sig($sig);
+    }
     $kernel->yield('shutdown');
 }
 
 sub shutdown {
     my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-    for (qw(log_monitor net_monitor web_server)) {
-        $kernel->call(delete $heap->{$_}, 'shutdown')
+    for my $child (qw(log_monitor net_monitor web_server)) {
+        $kernel->call(delete $heap->{$child}, 'shutdown')
     }
     $kernel->yield('clear_active_bans');
 }

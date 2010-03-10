@@ -52,7 +52,7 @@ sub new {
         INCLUDE_PATH => File::Spec->catdir(
             File::ShareDir::dist_dir('Mjollnir'), 'templates'
         ),
-        DELIMITER => ';',
+        DELIMITER => ( $^O eq 'Win32' ? ';' : ':' ),
     );
     my $self = bless {
         manager  => $manager,
