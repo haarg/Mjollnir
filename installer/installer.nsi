@@ -34,10 +34,14 @@ Section ""
     InitPluginsDir
     SetOutPath $PLUGINSDIR
 
+    Var /GLOBAL install_ipseccmd
+    Var /GLOBAL install_perl
+
     ${If} ${IsWinXP}
         nsExec::ExecToStack "ipseccmd"
-        Pop $R4
-        ${If} $R4 == "error"
+        Pop $R0
+        ${If} $R0 == "error"
+            StrCpy $install_ipseccmd 1
             NSISdl::download http://download.microsoft.com/download/d/3/8/d38066aa-4e37-4ae8-bce3-a4ce662b2024/WindowsXP-KB838079-SupportTools-ENU.exe "WindowsXP-KB838079-SupportTools-ENU.exe"
             Pop $R0
             ${If} $R0 != "success"
@@ -47,8 +51,9 @@ Section ""
     ${EndIf}
 
     nsExec::ExecToStack "C:\strawberry\perl\bin\perl.exe -V"
-    Pop $R5
-    ${If} $R5 == "error"
+    Pop $R0
+    ${If} $R0 == "error"
+        StrCpy $install_perl 1
         NSISdl::download http://strawberry-perl.googlecode.com/files/strawberry-perl-5.10.1.1.msi "strawberry-perl-5.10.1.1.msi"
         Pop $R0
         ${If} $R0 != "success"
@@ -59,11 +64,10 @@ Section ""
     File winpcap-nmap-4.11.exe
     File /r ${DISTDIR}\*.*
 
-    ${If} ${IsWinXP}
-    ${AndIf} $R4 == "error"
+    ${If} $install_ipseccmd == 1
         ExecWait '"$PLUGINSDIR\WindowsXP-KB838079-SupportTools-ENU.exe" /Q /C:"msiexec.exe /qb /i suptools.msi REBOOT=ReallySuppress ADDLOCAL=ALL"'
     ${EndIf}
-    ${If} $R5 == "error"
+    ${If} $install_perl == 1
         ExecWait 'msiexec.exe /qb /i "$PLUGINSDIR\strawberry-perl-5.10.1.1.msi"'
     ${EndIf}
     ExecWait '"$PLUGINSDIR\winpcap-nmap-4.11.exe" /S'
