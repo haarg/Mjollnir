@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use POE;
 use POE::Session;
@@ -110,9 +110,11 @@ sub got_packet {
     my $udp  = NetPacket::UDP->decode( $ip->{data} );
     my $data = $udp->{data};
     return unless $data;
-
+    if (not $data =~ s/\A\xff{4}//msx) {
+        return;
+    }
     if ( $data =~ m{
-        \A\xff{4}
+        \A
         connect[ ][0-9a-f]+[ ]
         "\\([^"]+)"
     }msx ) {
@@ -128,7 +130,7 @@ sub got_packet {
             } );
     }
     elsif ( $data =~ m{
-        \A\xff{4}\d
+        \A\d
         memberJoin[ ][^ ]*[ ]
         ([0-9a-f]{8})([0-9a-f]{8})
         [ ]\w+\x00
@@ -147,7 +149,7 @@ sub got_packet {
             } );
     }
     elsif ( $data =~ m{
-        \A\xff{4}\d
+        \A\d
         ident\x00
         ([^\x00]+)
     }msx ) {
