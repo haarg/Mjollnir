@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use File::ShareDir ();
 use File::Spec     ();
@@ -33,24 +33,33 @@ sub _create {
         steam_id TEXT,
         timestamp INTEGER
     );
+    CREATE UNIQUE INDEX id_bans_sid ON id_bans (steam_id);
+
     CREATE TABLE ip_bans (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip TEXT,
         steam_id TEXT,
         timestamp INTEGER
     );
+    CREATE INDEX ip_bans_ip ON ip_bans (ip);
+
     CREATE TABLE player_names (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         steam_id TEXT,
         name TEXT,
         timestamp INTEGER
     );
+    CREATE UNIQUE INDEX player_names_sid_name ON player_names (steam_id, name);
+    CREATE INDEX player_names_sid on player_names (steam_id ASC);
+
     CREATE TABLE player_ips (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         steam_id TEXT,
         ip TEXT,
         timestamp INTEGER
     );
+    CREATE UNIQUE INDEX player_ips_sid_ip ON player_ips (steam_id, ip);
+    CREATE INDEX player_ips_sid on player_ips (steam_id ASC);
 END_SQL
 }
 
@@ -78,21 +87,10 @@ sub add_name {
     my $name = shift;
 
     my $dbh = $self->dbh;
-    my $row
-        = $dbh->selectrow_arrayref(
-        'SELECT id FROM player_names WHERE steam_id = ? AND name = ?',
-        {}, $id, $name, );
-    if ($row) {
-        $dbh->do(
-            'UPDATE player_names SET steam_id = ?, name = ?, timestamp = ? WHERE id = ?',
-            {}, $id, $name, time, $row->[0] );
-    }
-    else {
-        $dbh->do(
-            'INSERT INTO player_names (steam_id, name, timestamp) VALUES (?, ?, ?)',
-            {}, $id, $name, time
-        );
-    }
+    $dbh->do(
+        'INSERT OR REPLACE INTO player_names (steam_id, name, timestamp) VALUES (?, ?, ?)',
+        {}, $id, $name, time
+    );
 }
 
 sub get_ips {
@@ -114,20 +112,10 @@ sub add_ip {
     my $ip   = shift;
 
     my $dbh = $self->dbh;
-    my $row
-        = $dbh->selectrow_arrayref(
-        'SELECT id FROM player_ips WHERE steam_id = ? AND ip = ?',
-        {}, $id, $ip, );
-    if ($row) {
-        $dbh->do( 'UPDATE player_ips SET timestamp = ? WHERE id = ?',
-            {}, time, $row->[0] );
-    }
-    else {
-        $dbh->do(
-            'INSERT INTO player_ips (steam_id, ip, timestamp) VALUES (?, ?, ?)',
-            {}, $id, $ip, time
-        );
-    }
+    $dbh->do(
+        'INSERT OR REPLACE INTO player_ips (steam_id, ip, timestamp) VALUES (?, ?, ?)',
+        {}, $id, $ip, time
+    );
 }
 
 sub check_banned_id {
@@ -209,18 +197,8 @@ sub add_id_ban {
     my $id   = shift;
     my $dbh  = $self->dbh;
 
-    my $row
-        = $dbh->selectrow_arrayref(
-        'SELECT id FROM id_bans WHERE steam_id = ?',
-        {}, $id, );
-    if ($row) {
-        $dbh->do( 'UPDATE id_bans SET timestamp = ? WHERE id = ?',
-            {}, time, $row->[0] );
-    }
-    else {
-        $dbh->do( 'INSERT INTO id_bans (steam_id, timestamp) VALUES (?, ?)',
-            {}, $id, time );
-    }
+    $dbh->do( 'INSERT OR REPLACE INTO id_bans (steam_id, timestamp) VALUES (?, ?)',
+        {}, $id, time );
 }
 
 sub get_id_for_ip {
@@ -242,18 +220,48 @@ sub get_latest_players {
     my $limit = shift // 16;
     my $dbh   = $self->dbh;
 
-    my $players = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
-SELECT player_names.steam_id, name, ip, player_names.timestamp FROM player_names INNER JOIN player_ips ON player_names.steam_id = player_ips.steam_id
-WHERE player_names.timestamp = (SELECT MAX(timestamp) FROM player_names a WHERE a.steam_id = player_names.steam_id)
-    AND player_ips.timestamp = (SELECT MAX(timestamp) FROM player_ips a WHERE a.steam_id = player_ips.steam_id)
-ORDER BY player_names.timestamp DESC
-LIMIT $limit;
+my $names = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
+    SELECT
+        steam_id,
+        name
+    FROM
+        player_names INNER JOIN (
+            SELECT
+                MAX(id) AS id
+            FROM
+                player_names
+            GROUP BY
+                steam_id
+            ORDER BY
+                MAX(timestamp) DESC, MAX(id) DESC
+            LIMIT $limit
+        ) ids ON player_names.id = ids.id
 END_SQL
-    for my $player ( @{$players} ) {
+
+my $ips = $dbh->selectall_hashref( <<"END_SQL", 'steam_id' );
+    SELECT
+        steam_id,
+        ip
+    FROM
+        player_ips INNER JOIN (
+            SELECT
+                MAX(id) AS id
+            FROM
+                player_ips
+            GROUP BY
+                steam_id
+            ORDER BY
+                MAX(timestamp) DESC, MAX(id) DESC
+            LIMIT $limit
+        ) ids ON player_ips.id = ids.id
+END_SQL
+
+    for my $player ( @{$names} ) {
+        $player->{ip} = $ips->{$player->{steam_id}}->{ip};
         $player->{banned_id} = $self->check_banned_id( $player->{steam_id} );
         $player->{banned_ip} = $self->check_banned_ip( $player->{ip} );
     }
-    return $players;
+    return $names;
 }
 
 1;
