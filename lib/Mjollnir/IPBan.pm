@@ -9,12 +9,12 @@ BEGIN {
         my $version = sprintf '%d.%03d', $major, $minor;
         if ($version == 5.001) {
             require Mjollnir::IPBan::ipseccmd;
-            Mjollnir::IPBans::ipseccmd->import;
+            Mjollnir::IPBan::ipseccmd->import;
             return;
         }
         elsif ($version > 5.001) {
             require Mjollnir::IPBan::netsh;
-            Mjollnir::IPBans::netsh->import;
+            Mjollnir::IPBan::netsh->import;
             return;
         }
     }
