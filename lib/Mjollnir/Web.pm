@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use POE;
 use POE::Kernel;
@@ -89,19 +89,19 @@ sub www_main {
         my $ban_data = $vars->{ban_data} = {};
         if ( my $ip = $param->{ip} ) {
             $ban_data->{ips} = [ $param->get_one('ip') ];
-            my $id = $self->call( 'get_id_for_ip', $ip );
-            $ban_data->{names} = $self->call( 'get_names_for_id', $id );
+            my $id = $self->db->get_id_for_ip($ip);
+            $ban_data->{names} = $self->db->get_names($id);
             if ( $param->{confirm} ) {
                 $ban_data->{result}
-                    = $self->call( ban_ip => $param->get_one('ip') );
+                    = $self->ban_ip( $param->get_one('ip') );
             }
         }
         elsif ( my $id = $param->{id} ) {
             $ban_data->{id}    = $id;
-            $ban_data->{ips}   = $self->call( 'get_ips_for_id', $id );
-            $ban_data->{names} = $self->call( 'get_names_for_id', $id );
+            $ban_data->{ips}   = $self->db->get_ips( $id );
+            $ban_data->{names} = $self->db->get_names( $id );
             if ( $param->{confirm} ) {
-                $ban_data->{result} = $self->call( ban_id => $param->{id} );
+                $ban_data->{result} = $self->ban_id( $param->{id} );
             }
         }
     }
@@ -132,10 +132,10 @@ sub www_player {
         id      => $player,
         ips     => [ map { {
             ip      => $_,
-            banned  => $self->call('checked_banned_ip' => $_),
-        } } @{ $self->call('get_ips_for_id' => $player) } ],
-        names   => $self->call('get_names_for_id' => $player),
-        banned  => $self->call('check_banned_id' => $player),
+            banned  => $self->db->check_banned_ip($_),
+        } } @{ $self->db->get_ips($player) } ],
+        names   => $self->db->get_names($player),
+        banned  => $self->db->check_banned_id($player),
     };
     my $content = '';
     $self->{template}->process( 'player', $vars, \$content );
@@ -153,8 +153,8 @@ sub www_bans {
     $res->content_type('text/html; charset=utf-8');
 
     my $vars = {
-        ips     => $self->call('get_ip_bans'),
-        ids     => $self->call('get_id_bans'),
+        ips     => $self->db->get_ip_bans,
+        ids     => $self->db->get_id_bans,
     };
     my $content = '';
     $self->{template}->process( 'bans', $vars, \$content );
@@ -165,17 +165,22 @@ sub www_bans {
 
 sub get_players {
     my $self = shift;
-    return $self->call('get_players');
+    return $self->db->get_latest_players;
 }
 
-sub post {
+sub db {
     my $self = shift;
-    POE::Kernel->post( $self->{manager}, @_ );
+    return POE::Kernel->call( $self->{manager}, 'db' );
 }
 
-sub call {
+sub ban_id {
     my $self = shift;
-    return POE::Kernel->call( $self->{manager}, @_ );
+    return POE::Kernel->call( $self->{manager}, 'ban_id', @_ );
+}
+
+sub ban_ip {
+    my $self = shift;
+    return POE::Kernel->call( $self->{manager}, 'ban_ip', @_ );
 }
 
 1;
