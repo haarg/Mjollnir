@@ -8,7 +8,6 @@ our $VERSION = 0.01;
 use POE;
 use POE::Kernel;
 use Mjollnir::Monitor;
-use Mjollnir::LogMonitor;
 use Mjollnir::Web;
 use Mjollnir::DB;
 use Mjollnir::IPBan;
@@ -47,7 +46,6 @@ sub _start {
     my ( $kernel, $heap, %config ) = @_[ KERNEL, HEAP, ARG0..$#_ ];
     $heap->{db}             = Mjollnir::DB->new;
 
-    $heap->{log_monitor}    = Mjollnir::LogMonitor->spawn($config{log_file});
     $heap->{net_monitor}    = Mjollnir::Monitor->spawn($config{device});
     $heap->{web_server}     = Mjollnir::Web->spawn($config{listen});
 
@@ -67,7 +65,8 @@ sub exit_signal {
 
 sub shutdown {
     my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-    for my $child (qw(log_monitor net_monitor web_server)) {
+    print "Shutting down...\n";
+    for my $child (qw(net_monitor web_server)) {
         $kernel->call(delete $heap->{$child}, 'shutdown')
     }
     $kernel->yield('clear_active_bans');
