@@ -129,12 +129,10 @@ sub stopgame {
 
 sub join {
     my ( $kernel, $heap, $steam_id, undef, $name ) = @_[KERNEL, HEAP, ARG0..$#_];
-    warn "$steam_id joined as $name\n";
 }
 
 sub quit {
     my ( $kernel, $heap, $steam_id, undef, $name ) = @_[KERNEL, HEAP, ARG0..$#_];
-    warn "$steam_id quit as $name\n";
 }
 
 1;
