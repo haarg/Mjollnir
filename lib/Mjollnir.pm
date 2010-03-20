@@ -26,6 +26,7 @@ sub create {
                 ban_ip
                 ban_id
                 reload_bans
+                db
             ) ],
             $class => { player_connect => 'player_join' },
         ],
