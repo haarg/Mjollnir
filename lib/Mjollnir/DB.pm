@@ -220,7 +220,7 @@ sub get_latest_players {
     my $limit = shift // 16;
     my $dbh   = $self->dbh;
 
-my $names = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
+    my $names = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
     SELECT
         steam_id,
         name
@@ -237,23 +237,26 @@ my $names = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
             LIMIT $limit
         ) ids ON player_names.id = ids.id
 END_SQL
+    my @steam_ids = map { $_->{steam_id} } @$names;
 
-my $ips = $dbh->selectall_hashref( <<"END_SQL", 'steam_id' );
-    SELECT
-        steam_id,
-        ip
-    FROM
-        player_ips INNER JOIN (
-            SELECT
-                MAX(id) AS id
-            FROM
-                player_ips
-            GROUP BY
-                steam_id
-            ORDER BY
-                MAX(timestamp) DESC, MAX(id) DESC
-            LIMIT $limit
-        ) ids ON player_ips.id = ids.id
+    my $ips = $dbh->selectall_hashref( <<"END_SQL", 'steam_id', {}, @steam_ids );
+        SELECT
+            steam_id,
+            ip
+        FROM
+            player_ips INNER JOIN (
+                SELECT
+                    MAX(id) AS id
+                FROM
+                    player_ips
+                WHERE
+                    steam_id IN (@{[join ',', ('?') x @steam_ids]})
+                GROUP BY
+                    steam_id
+                ORDER BY
+                    MAX(timestamp) DESC, MAX(id) DESC
+                LIMIT $limit
+            ) ids ON player_ips.id = ids.id
 END_SQL
 
     for my $player ( @{$names} ) {
