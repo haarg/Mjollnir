@@ -69,6 +69,9 @@ Section ""
     ${EndIf}
     ${If} $install_perl == 1
         ExecWait 'msiexec.exe /qb /i "$PLUGINSDIR\strawberry-perl-5.10.1.1.msi"'
+        ReadEnvStr $R0 "PATH"
+        StrCpy $R0 "C:\strawberry\c\bin;C:\strawberry\perl\bin;$R0"
+        System::Call 'Kernel32::SetEnvironmentVariableA(t, t) i("PATH", R0).r0'
     ${EndIf}
     ExecWait '"$PLUGINSDIR\winpcap-nmap-4.11.exe" /S'
     nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe C:\strawberry\perl\bin\ppm.pl install Net::Pcap'
