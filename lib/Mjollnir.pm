@@ -36,6 +36,7 @@ sub create {
 
 sub _start {
     my ( $kernel, $heap, %config ) = @_[ KERNEL, HEAP, ARG0..$#_ ];
+    print "Starting Mjollnir...\n";
     $heap->{db}             = Mjollnir::DB->new;
 
     $heap->{net_monitor}    = Mjollnir::Monitor->spawn($config{device});
