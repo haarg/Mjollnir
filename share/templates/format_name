@@ -1,0 +1,11 @@
+[%- IF segments.size -%]
+[%- FOREACH segments -%]
+[%- IF color -%]
+<span class="name-color-[% color %]">[% text | html %]</span>
+[%- ELSE -%]
+[% text | html %]
+[%- END -%]
+[%- END -%]
+[%- ELSE -%]
+UnnamedPlayer ([% raw_name | html %])
+[%- END -%]

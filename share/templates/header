@@ -4,20 +4,34 @@
         <title>Mjollnir Web</title>
     </head>
     <style type="text/css">
-        .banned * {
+        .banned td {
             text-decoration: line-through;
+        }
+        .banned .col-control, .banned .col-icon {
+            text-decoration: none;
+        }
+        .banned-id .ban-button-id, .banned-id .ban-button-ip {
+            visibility: hidden;
+        }
+        .banned-ip .ban-button-ip {
+            visibility: hidden;
         }
         form.ban-button {
             display: inline;
         }
         .player-list {
             width: 700px;
+            color: #ffffff;
+            background-color: #606060;
         }
         .player-list th {
             border-bottom: 2px solid #000;
         }
         .player-list td {
             border-bottom: 1px solid #000;
+        }
+        .player-list a, .player-list a:link, .player-list a:active, .player-list a:visited {
+            color: #fff;
         }
         .col-icon {
             width: 20px;
@@ -38,16 +52,38 @@
             padding: 10px;
         }
         .header-bar, .header-bar a, .header-bar a:link, .header-bar a:active, .header-bar a:visited {
-            color: #fff;
+            color: #ffffff;
+        }
+        a, a:link, a:active {
+            color: #ffffff;
+        }
+        a:visited {
+            color: #c0c0c0;
         }
         body {
             margin: 0;
             padding: 0;
-            font: 10pt verdana,geneva,lucida,'lucida grande',arial,helvetica,sans-serif;
+            font: 10pt 'Trebuchet MS', 'Segoe UI', Tahoma, verdana, geneva, lucida, 'lucida grande', arial, helvetica, sans-serif;
+            background-color: #606060;
+            color: #ffffff;
         }
+        .content {
+            padding: 0 10px;
+        }
+        .name-color-black  { color: #000000 }
+        .name-color-red    { color: #ff2020 }
+        .name-color-green  { color: #00ff00 }
+        .name-color-yellow { color: #ffff00 }
+        .name-color-blue   { color: #0000ff }
+        .name-color-cyan   { color: #00ffff }
+        .name-color-pink   { color: #ff80ff }
+        .name-color-white  { color: #ffffff }
+        .name-color-grey   { color: #808080 }
+        .name-color-other  { color: #000000 }
     </style>
     <body>
         <div class="header-bar">
             <a href="/">Player List</a> •
             <a href="/bans">Bans</a>
         </div>
+        <div class="content">

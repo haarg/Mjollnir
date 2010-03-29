@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 use POE;
 use POE::Kernel;
@@ -12,6 +12,7 @@ use Template;
 use File::ShareDir ();
 use File::Spec;
 use POE::Component::Server::PSGI;
+use Math::BigInt;
 
 sub spawn {
     my $class = shift;
@@ -23,6 +24,7 @@ sub spawn {
             _start => sub {
                 my ( $heap, $parent, $listen ) = @_[HEAP, SENDER, ARG0];
                 my $web = $class->new( $parent->ID );
+                my $app = sub { $web->run_psgi(@_) };
                 my ($host, $port) = split /:/, $listen;
                 my $server = POE::Component::Server::PSGI->new(
                     host => $host,
@@ -30,7 +32,7 @@ sub spawn {
                 );
                 open my $olderr, '>&', STDERR;
                 open STDERR, '>', File::Spec->devnull;
-                $heap->{web_session} = $server->register_service( sub { $web->run_psgi(@_) } );
+                $heap->{web_session} = $server->register_service( $app );
                 open STDERR, '>&', $olderr;
                 close $olderr;
                 print "Listening for HTTP connections:\n\t$listen\n";
@@ -48,16 +50,30 @@ sub spawn {
 sub new {
     my $class    = shift;
     my $manager  = shift;
-    my $template = Template->new(
+    my $self = bless {
+        manager  => $manager,
+    }, $class;
+    $self->{template} = Template->new(
         INCLUDE_PATH => File::Spec->catdir(
             File::ShareDir::dist_dir('Mjollnir'), 'templates'
         ),
         DELIMITER => ( $^O eq 'MSWin32' ? ';' : ':' ),
+        FILTERS => {
+            format_name => [ sub {
+                my $context = shift;
+                return sub {
+                    my $name = shift;
+                    my @parts = $self->name_parts($name);
+                    my $template = $context->template('format_name');
+                    my $output = $context->process($template, {
+                        raw_name => $name,
+                        segments => \@parts,
+                    });
+                    return $output;
+                };
+            }, 1],
+        },
     );
-    my $self = bless {
-        manager  => $manager,
-        template => $template,
-    }, $class;
     return $self;
 }
 
@@ -76,7 +92,7 @@ sub run_psgi {
     if ($self->can($call_method)) {
         return $self->$call_method($req, $data);
     }
-    return [404, ['Content-Type' => 'text/plain'], ['not found']];
+    return [404, ['Content-Type' => 'text/plain'], ['Not found']];
 }
 
 sub www_main {
@@ -115,7 +131,6 @@ sub www_main {
 
     my $content = '';
     $self->{template}->process( 'main', $vars, \$content );
-
     $res->body($content);
     return $res->finalize;
 }
@@ -136,6 +151,7 @@ sub www_player {
         } } @{ $self->db->get_ips($player) } ],
         names   => $self->db->get_names($player),
         banned  => $self->db->check_banned_id($player),
+        community_link => $self->community_link_for_id($player),
     };
     my $content = '';
     $self->{template}->process( 'player', $vars, \$content );
@@ -155,6 +171,7 @@ sub www_bans {
     my $vars = {
         ips     => $self->db->get_ip_bans,
         ids     => $self->db->get_id_bans,
+        names   => $self->db->get_name_bans,
     };
     my $content = '';
     $self->{template}->process( 'bans', $vars, \$content );
@@ -181,6 +198,36 @@ sub ban_id {
 sub ban_ip {
     my $self = shift;
     return POE::Kernel->call( $self->{manager}, 'ban_ip', @_ );
+}
+
+sub name_parts {
+    my $self = shift;
+    my $name = shift;
+    my @colors = qw(black red green yellow blue cyan pink white grey other);
+    my @outparts;
+    my @parts = split /\^(\d)/, $name;
+    unshift @parts, undef;
+    while (@parts) {
+        my $color = shift @parts;
+        my $segment = shift @parts;
+        next
+            if $segment eq '';
+        push @outparts, {
+            raw => defined $color ? '^' . $color . $segment : $segment,
+            color_code => $color,
+            text => $segment,
+            color => defined $color ? $colors[$color] : undef,
+        };
+    }
+    return @outparts;
+}
+
+sub community_link_for_id {
+    my $self = shift;
+    my $steam_id = shift;
+    my $dec_id = Math::BigInt->from_hex('0x' . $steam_id)->bstr;
+    my $link = 'http://steamcommunity.com/profiles/' . $dec_id . '/';
+    return $link;
 }
 
 1;

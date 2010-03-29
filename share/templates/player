@@ -3,10 +3,11 @@
         [%- IF banned -%]
         <h2>Banned by ID</h2>
         [%- END -%]
+        <a href="[% community_link %]">Steam Community page</a>
         <h2>Names:</h2>
         <ul>
         [%- FOREACH name IN names -%]
-            <li>[% name %]</li>
+            <li>[% name | format_name %]</li>
         [%- END -%]
         </ul>
         <h2>IPs:</h2>
