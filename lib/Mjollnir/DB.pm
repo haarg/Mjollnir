@@ -3,64 +3,78 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 use File::ShareDir ();
 use File::Spec     ();
 use DBI;
 use DBD::SQLite;
+use constant DB_SCHEMA_VERSION => 2;
 
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
 
+    $self->{dbh} = $self->_init_dbh;
+    return $self;
+}
+
+sub db_filename {
     my $data_dir = File::ShareDir::dist_dir('Mjollnir');
     my $db_file  = File::Spec->catfile( $data_dir, 'mjollnir.db' );
-    my $create   = !-e $db_file;
-    $self->{dbh} = DBI->connect( 'dbi:SQLite:' . $db_file );
+    return $db_file;
+}
+
+sub _init_dbh {
+    my $self = shift;
+    my $db_file = $self->db_filename;
+    my $create = !-e $db_file;
+    my $dbh = DBI->connect( 'dbi:SQLite:' . $db_file );
     if ($create) {
-        $self->_create;
+        $self->_create($dbh);
+        $dbh->do('PRAGMA user_version = ' . DB_SCHEMA_VERSION);
     }
-    return $self;
+    else {
+        my $current_db_version = $dbh->selectrow_array('PRAGMA user_version');
+        $current_db_version ||= 0;
+        if ($current_db_version == DB_SCHEMA_VERSION) {
+            return $dbh;
+        }
+        elsif ($current_db_version < DB_SCHEMA_VERSION) {
+            for my $step ($current_db_version .. DB_SCHEMA_VERSION - 1) {
+                my $filename = File::ShareDir::dist_file('Mjollnir', 'sql/upgrade-' . $step . '-' . ($step + 1) . '.sql');
+                $self->_run_sql_script($dbh, $filename);
+                $dbh->do('PRAGMA user_version = ' . ($step + 1));
+            }
+        }
+        else {
+            die;
+        }
+    }
+
+    return $dbh;
+}
+
+sub _run_sql_script {
+    my $self = shift;
+    my $dbh = shift;
+    my $filename = shift;
+    open my $fh, '<', $filename
+        or die "Can't open $filename: $!";
+    my $sql = do { local $/; <$fh> };
+    close $fh;
+    my @sql = grep { /\S/ } split /;$/msx, $sql;
+    for my $stmt (@sql) {
+        $dbh->do($stmt);
+    }
+    return 1;
 }
 
 sub _create {
     my $self = shift;
-    my $dbh  = $self->{dbh};
-    $dbh->do($_) for split /;/, <<END_SQL;
-    CREATE TABLE id_bans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        steam_id TEXT,
-        timestamp INTEGER
-    );
-    CREATE UNIQUE INDEX id_bans_sid ON id_bans (steam_id);
-
-    CREATE TABLE ip_bans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ip TEXT,
-        steam_id TEXT,
-        timestamp INTEGER
-    );
-    CREATE INDEX ip_bans_ip ON ip_bans (ip);
-
-    CREATE TABLE player_names (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        steam_id TEXT,
-        name TEXT,
-        timestamp INTEGER
-    );
-    CREATE UNIQUE INDEX player_names_sid_name ON player_names (steam_id, name);
-    CREATE INDEX player_names_sid on player_names (steam_id ASC);
-
-    CREATE TABLE player_ips (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        steam_id TEXT,
-        ip TEXT,
-        timestamp INTEGER
-    );
-    CREATE UNIQUE INDEX player_ips_sid_ip ON player_ips (steam_id, ip);
-    CREATE INDEX player_ips_sid on player_ips (steam_id ASC);
-END_SQL
+    my $dbh  = shift;
+    my $filename = File::ShareDir::dist_file('Mjollnir', 'sql/create.sql');
+    return $self->_run_sql_script($filename);
 }
 
 sub dbh {

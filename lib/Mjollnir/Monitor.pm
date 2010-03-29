@@ -120,25 +120,29 @@ sub got_packet {
     }msx ) {
         my $playerdata = $1;
         my %data = split /\\/, $playerdata;
+        my $steam_id = $data{steamid};
+        my $high_id = substr($steam_id, -8, 8, '');
+        $steam_id = $high_id . ( 0 x (8 - length $steam_id) ) . $steam_id;
+
         $kernel->post(
             $heap->{target_session},
             'player_connect',
             {
                 ip       => $ip->{src_ip},
                 name     => $data{name},
-                steam_id => $data{steamid},
+                steam_id => $steam_id,
             } );
     }
     elsif ( $data =~ m{
         \A\d
         memberJoin[ ][^ ]*[ ]
-        ([0-9a-f]{8})([0-9a-f]{8})
+        ([0-9a-f]{16})
         [ ]\w+\x00
         .{44}
         ([^\x00]+)
     }msx ) {
-        my $steam_id    = $2 . $1;
-        my $player_name = $3;
+        my $steam_id    = $1;
+        my $player_name = $2;
         $kernel->post(
             $heap->{target_session},
             'player_join',
