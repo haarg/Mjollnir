@@ -137,10 +137,10 @@ sub check_banned_id {
     my $id   = shift;
 
     my $dbh = $self->dbh;
-    my ($match) = @{
-        $dbh->selectrow_arrayref(
+    my $match =
+        $dbh->selectrow_array(
             'SELECT COUNT(*) FROM id_bans WHERE steam_id = ?',
-            {}, $id, ) };
+            {}, $id, );
     return $match;
 }
 
@@ -149,9 +149,9 @@ sub check_banned_ip {
     my $ip   = shift;
 
     my $dbh = $self->dbh;
-    my ($match) = @{
-        $dbh->selectrow_arrayref( 'SELECT COUNT(*) FROM ip_bans WHERE ip = ?',
-            {}, $ip, ) };
+    my $match =
+        $dbh->selectrow_array( 'SELECT COUNT(*) FROM ip_bans WHERE ip = ?',
+            {}, $ip, );
     return $match;
 }
 
@@ -183,27 +183,19 @@ sub add_ip_ban {
 
     my $row;
     if ($id) {
-        $row
-            = $dbh->selectrow_arrayref(
-            'SELECT id FROM ip_bans WHERE ip = ? AND steam_id = ?',
+        $dbh->do(
+            'DELETE FROM ip_bans WHERE ip = ? AND steam_id = ?',
             {}, $ip, $id, );
     }
     else {
-        $row
-            = $dbh->selectrow_arrayref(
+        $dbh->do(
             'SELECT id FROM ip_bans WHERE ip = ? AND steam_id IS NULL',
             {}, $ip, );
     }
-    if ($row) {
-        $dbh->do( 'UPDATE ip_bans SET timestamp = ? WHERE id = ?',
-            {}, time, $row->[0] );
-    }
-    else {
-        $dbh->do(
-            'INSERT INTO ip_bans (steam_id, ip, timestamp) VALUES (?, ?, ?)',
-            {}, $id, $ip, time
-        );
-    }
+    $dbh->do(
+        'INSERT INTO ip_bans (steam_id, ip, timestamp) VALUES (?, ?, ?)',
+        {}, $id, $ip, time
+    );
 }
 
 sub add_id_ban {
@@ -231,7 +223,7 @@ sub get_id_for_ip {
 
 sub get_latest_players {
     my $self  = shift;
-    my $limit = shift // 16;
+    my $limit = shift // 18;
     my $dbh   = $self->dbh;
 
     my $names = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
