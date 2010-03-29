@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 use POE;
 use POE::Kernel;
@@ -83,17 +83,26 @@ sub player_join {
     my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
     $heap->{db}->add_name( $data->{steam_id}, $data->{name} );
     $heap->{db}->add_ip( $data->{steam_id}, $data->{ip} );
-    if ( $heap->{db}->check_banned_id( $data->{steam_id} ) ) {
-        $kernel->yield( ban_ip => $data->{ip} );
-    }
+    $kernel->yield(check_user => $data);
     print "join\t$data->{steam_id}\t$data->{ip}\t$data->{name}\n";
 }
 
 sub player_ident {
     my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-    my $id = $heap->{db}->get_id_for_ip( $data->{ip} );
+    my $id = $data->{steam_id} = $heap->{db}->get_id_for_ip( $data->{ip} );
     $heap->{db}->add_name( $id, $data->{name} );
+    $kernel->yield(check_user => $data);
     print "ident\t$id\t$data->{ip}\t$data->{name}\n";
+}
+
+sub check_user {
+    my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
+    if ( $heap->{db}->check_banned_id( $data->{steam_id} ) ) {
+        $kernel->yield( ban_ip => $data->{ip}, $data->{steam_id} );
+    }
+    if ( $heap->{db}->check_banned_name( $data->{name} ) ) {
+        $kernel->yield( ban_ip => $data->{ip} );
+    }
 }
 
 sub reload_bans {

@@ -12,4 +12,10 @@
             <li><a href="/player/[% id %]">[% id %]</a></li>
         [%- END -%]
         </ul>
+        <h2>Name Bans</h2>
+        <ul>
+        [%- FOREACH name IN names -%]
+            <li>[% name | html %]</li>
+        [%- END -%]
+        </ul>
 [%- PROCESS footer -%]

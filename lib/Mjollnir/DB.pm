@@ -273,6 +273,38 @@ END_SQL
     return $names;
 }
 
+sub add_name_ban {
+    my $self = shift;
+    my $name_pattern = shift;
+    my $dbh = $self->dbh;
+
+    $dbh->do( 'INSERT OR REPLACE INTO name_bans (name_pattern, timestamp) VALUES (?, ?)',
+        {}, $name_pattern, time );
+}
+
+sub get_name_bans {
+    my $self = shift;
+
+    my $dbh = $self->dbh;
+    my @names = map {@$_} @{
+        $dbh->selectall_arrayref('SELECT name_pattern FROM name_bans ORDER BY name_pattern ASC')
+    };
+    return \@names;
+}
+
+sub check_banned_name {
+    my $self = shift;
+    my $name = shift;
+
+    my $bans = $self->get_name_bans;
+    for my $banned_name (@bans) {
+        if ($name =~ /$banned_name/) {
+            return 1;
+        }
+    }
+    return;
+}
+
 1;
 
 __END__
