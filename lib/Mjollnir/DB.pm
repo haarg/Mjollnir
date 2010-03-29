@@ -29,7 +29,10 @@ sub _init_dbh {
     my $self = shift;
     my $db_file = $self->db_filename;
     my $create = !-e $db_file;
-    my $dbh = DBI->connect( 'dbi:SQLite:' . $db_file );
+    my $dbh = DBI->connect( 'dbi:SQLite:' . $db_file, undef, undef, {
+        PrintError => 0,
+        RaiseError => 1,
+    });
     if ($create) {
         $self->_create($dbh);
         $dbh->do('PRAGMA user_version = ' . DB_SCHEMA_VERSION);
@@ -42,9 +45,11 @@ sub _init_dbh {
         }
         elsif ($current_db_version < DB_SCHEMA_VERSION) {
             for my $step ($current_db_version .. DB_SCHEMA_VERSION - 1) {
-                my $filename = File::ShareDir::dist_file('Mjollnir', 'sql/upgrade-' . $step . '-' . ($step + 1) . '.sql');
+                my $next_step = $step + 1;
+                my $filename = File::ShareDir::dist_file('Mjollnir', 'sql/upgrade-' . $step . '-' . $next_step . '.sql');
+                print "Upgrading DB Schema to version $next_step...\n";
                 $self->_run_sql_script($dbh, $filename);
-                $dbh->do('PRAGMA user_version = ' . ($step + 1));
+                $dbh->do("PRAGMA user_version = $next_step");
             }
         }
         else {
@@ -65,7 +70,7 @@ sub _run_sql_script {
     close $fh;
     my @sql = grep { /\S/ } split /;$/msx, $sql;
     for my $stmt (@sql) {
-        $dbh->do($stmt);
+        eval { $dbh->do($stmt) } or die "$@: $stmt\n";
     }
     return 1;
 }
@@ -297,7 +302,7 @@ sub check_banned_name {
     my $name = shift;
 
     my $bans = $self->get_name_bans;
-    for my $banned_name (@bans) {
+    for my $banned_name ( @{ $bans } ) {
         if ($name =~ /$banned_name/) {
             return 1;
         }
