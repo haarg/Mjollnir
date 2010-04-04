@@ -7,12 +7,13 @@ our $VERSION = 0.03;
 
 use POE;
 use POE::Kernel;
+use POE::Component::Server::PSGI;
 use Plack::Request;
+use Plack::MIME;
 use Template;
 use File::ShareDir ();
 use File::Spec;
-use POE::Component::Server::PSGI;
-use Math::BigInt;
+use Mjollnir::Player;
 
 sub spawn {
     my $class = shift;
@@ -63,11 +64,11 @@ sub new {
                 my $context = shift;
                 return sub {
                     my $name = shift;
-                    my @parts = $self->name_parts($name);
+                    my $parts = $self->_segment_name($name);
                     my $template = $context->template('format_name');
                     my $output = $context->process($template, {
                         raw_name => $name,
-                        segments => \@parts,
+                        segments => $parts,
                     });
                     return $output;
                 };
@@ -84,13 +85,29 @@ sub run_psgi {
 
     my $path_info = $req->path_info;
     my (undef, $command, $data) = split m{/}, $path_info, 3;
-    
+
     if ($command eq '') {
         return $self->www_main($req);
     }
     my $call_method = 'www_' . $command;
     if ($self->can($call_method)) {
         return $self->$call_method($req, $data);
+    }
+    my $filepath = File::Spec->catfile(File::ShareDir::dist_dir('Mjollnir'), 'templates', $path_info);
+    if ( -e $filepath ) {
+        my $filename = $path_info;
+        $filename =~ s{\A/}{}msx;
+        my $vars = { param => $req->parameters };
+        my $mime = Plack::MIME->mime_type($filename) || 'text/plain';
+        if ($mime =~ m{\Atext/}) {
+            $mime .= '; charset=utf-8';
+        }
+        return sub {
+            my $respond = shift;
+            my $writer = $respond->([200, ['Content-Type' => $mime]]);
+            $self->process_template( $filename, $vars, $writer );
+            return;
+        };
     }
     return [404, ['Content-Type' => 'text/plain'], ['Not found']];
 }
@@ -99,64 +116,54 @@ sub www_main {
     my $self = shift;
     my $req  = shift;
 
+    my $db = $self->db;
     my $param = $req->parameters;
     my $vars = { param => $param };
-    if ( $param->{op} && $param->{op} eq 'ban' ) {
-        my $ban_data = $vars->{ban_data} = {};
-        if ( my $ip = $param->{ip} ) {
-            $ban_data->{ips} = [ $param->get_one('ip') ];
-            my $id = $self->db->get_id_for_ip($ip);
-            $ban_data->{names} = $self->db->get_names($id);
-            if ( $param->{confirm} ) {
-                $ban_data->{result}
-                    = $self->ban_ip( $param->get_one('ip') );
-            }
-        }
-        elsif ( my $id = $param->{id} ) {
-            $ban_data->{id}    = $id;
-            $ban_data->{ips}   = $self->db->get_ips( $id );
-            $ban_data->{names} = $self->db->get_names( $id );
-            if ( $param->{confirm} ) {
-                $ban_data->{result} = $self->ban_id( $param->{id} );
-            }
+    if ( my $id = $param->{kick} ) {
+        my $kick_data = $vars->{kick} = {};
+        my $player = $kick_data->{player} = Mjollnir::Player->new($db, $id);
+        if ( $param->{confirm} ) {
+            $kick_data->{result}
+                = $param->{ban} ? $player->ban(reason => $param->{reason})
+                                : $player->kick
+                                ;
         }
     }
 
-    $vars->{player_list} = $self->get_players;
-    $vars->{refresh}     = $req->request_uri;
-    $vars->{post_uri}    = $req->base;
+    $vars->{players}    = Mjollnir::Player->find_latest($db);
+    $vars->{refresh}    = $req->request_uri;
+    $vars->{post_uri}   = $req->base;
 
     my $res = $req->new_response(200);
     $res->content_type('text/html; charset=utf-8');
-
-    my $content = '';
-    $self->{template}->process( 'main', $vars, \$content );
-    $res->body($content);
+    $res->body( $self->process_template('main', $vars) );
     return $res->finalize;
 }
 
 sub www_player {
     my $self = shift;
     my $req  = shift;
-    my $player = shift;
+    my $player_id = shift;
 
+    my $db = $self->db;
+    my $player = Mjollnir::Player->new($db, $player_id);
+
+    my $param = $req->parameters;
     my $res = $req->new_response(200);
     $res->content_type('text/html; charset=utf-8');
 
+    $player->refresh;
     my $vars = {
-        id      => $player,
-        ips     => [ map { {
-            ip      => $_,
-            banned  => $self->db->check_banned_ip($_),
-        } } @{ $self->db->get_ips($player) } ],
-        names   => $self->db->get_names($player),
-        banned  => $self->db->check_banned_id($player),
-        community_link => $self->community_link_for_id($player),
+        player  => $player,
+        check_banned_ip => sub { $db->check_banned_ip(@_) },
+        param => $param,
     };
-    my $content = '';
-    $self->{template}->process( 'player', $vars, \$content );
+    
+    if ($param->{unban} && $param->{confirm}) {
+        $vars->{unban}{result} = $player->unban;
+    }
 
-    $res->body($content);
+    $res->body( $self->process_template( 'player', $vars ) );
     return $res->finalize;
 }
 
@@ -168,21 +175,67 @@ sub www_bans {
     my $res = $req->new_response(200);
     $res->content_type('text/html; charset=utf-8');
 
+    my $db = $self->db;
     my $vars = {
-        ips     => $self->db->get_ip_bans,
-        ids     => $self->db->get_id_bans,
-        names   => $self->db->get_name_bans,
+        ips     => scalar $db->get_ip_bans,
+        players => scalar Mjollnir::Player->find_banned($db),
+        names   => scalar $db->get_name_bans,
     };
-    my $content = '';
-    $self->{template}->process( 'bans', $vars, \$content );
 
-    $res->body($content);
+    $res->body( $self->process_template( 'bans', $vars ) );
     return $res->finalize;
 }
 
-sub get_players {
+sub www_search {
     my $self = shift;
-    return $self->db->get_latest_players;
+    my $req  = shift;
+
+    my $param = $req->parameters;
+    my $search = $param->{q};
+    my $res = $req->new_response;
+    if (!defined $search || $search eq '') {
+        $res->redirect($req->base);
+        return $res->finalize;
+    }
+
+    return sub {
+        my $respond = shift;
+
+        my $db = $self->db;
+        my $player;
+        if ( $search =~ m{\Ahttp://(?:www\.)?steamcommunity.com/}msx ) {
+            $player = Mjollnir::Player->new_by_link($db, $search);
+        }
+        elsif ( $search =~ /\A[0-9a-zA-Z]{16}\z/ ) {
+            $player = Mjollnir::Player->new($db, $search);
+        }
+        else {
+            my $players;
+            if ( $search =~ /\A(?:\d+[.]){3}\d+\z/ ) {
+                $players = Mjollnir::Player->find_by_ip($db, $search);
+            }
+            else {
+                $players = Mjollnir::Player->find_by_name($db, $search);
+            }
+            if (@$players == 1) {
+                $player = $players->[0];
+            }
+            else {
+                my $vars = {
+                    players => $players,
+                    param => $param,
+                };
+                my $writer = $respond->([200, ['Content-Type' => 'text/html; charset=utf-8']]);
+                $self->process_template('search', $vars, $writer);
+                return;
+            }
+        }
+        if ($player) {
+            $res->redirect($req->base . 'player/' . $player->id);
+            $respond->($res->finalize);
+            return;
+        }
+    };
 }
 
 sub db {
@@ -200,34 +253,49 @@ sub ban_ip {
     return POE::Kernel->call( $self->{manager}, 'ban_ip', @_ );
 }
 
-sub name_parts {
+sub process_template {
+    my $self = shift;
+    my $template = shift;
+    my $vars = shift;
+    my $write = shift;
+    if ($write) {
+        my $o = Plack::Util::inline_object(
+            print => sub { $write->write(@_) },
+        );
+        $self->{template}->process( $template, $vars, $o );
+        $write->close;
+        return;
+    }
+    else {
+        my $content = '';
+        $self->{template}->process( $template, $vars, \$content );
+        return $content;
+    }
+}
+
+my @name_colors = qw(black red green yellow blue cyan pink white grey other);
+sub _segment_name {
     my $self = shift;
     my $name = shift;
-    my @colors = qw(black red green yellow blue cyan pink white grey other);
     my @outparts;
     my @parts = split /\^(\d)/, $name;
     unshift @parts, undef;
     while (@parts) {
         my $color = shift @parts;
         my $segment = shift @parts;
-        next
-            if $segment eq '';
+        $segment //= '';
         push @outparts, {
-            raw => defined $color ? '^' . $color . $segment : $segment,
-            color_code => $color,
             text => $segment,
-            color => defined $color ? $colors[$color] : undef,
+            defined $color ? (
+                raw         => '^' . $color . $segment,
+                color       => $name_colors[$color],
+                color_code  => $color,
+            ) : (
+                raw         => $segment,
+            ),
         };
     }
-    return @outparts;
-}
-
-sub community_link_for_id {
-    my $self = shift;
-    my $steam_id = shift;
-    my $dec_id = Math::BigInt->from_hex('0x' . $steam_id)->bstr;
-    my $link = 'http://steamcommunity.com/profiles/' . $dec_id . '/';
-    return $link;
+    return \@outparts;
 }
 
 1;

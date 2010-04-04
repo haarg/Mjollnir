@@ -1,6 +1,6 @@
 [%- PROCESS header -%]
         <h1>Mjöllnir</h1>
-    [%- IF param.op == "ban"; PROCESS ban_header; END -%]
+    [%- IF param.kick; PROCESS kick_header; END -%]
     [%- PROCESS player_list -%]
     [%- IF refresh -%]
         <script type="text/javascript">

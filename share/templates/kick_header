@@ -1,0 +1,29 @@
+<div class="kick-header">
+[%- IF param.ban -%]
+    <h2>Banning player [% kick.player.name | format_name %]</h2>
+[%- ELSE -%]
+    <h2>Kicking player [% kick.player.name | format_name %]</h2>
+[%- END -%]
+[%- IF param.confirm -%]
+    [%- IF kick.result -%]
+        <h3>Completed complete.</h3>
+    [%- ELSE -%]
+        <h3 class="error">Error.</h3>
+    [%- END -%]
+[%- ELSE -%]
+    <h3>Are you sure you want to proceed?</h3>
+    <form method="post" action="[% post_uri %]">
+            <input type="hidden" name="kick" value="[% kick.player.id %]" />
+        [%- IF param.ban -%]
+            <input type="hidden" name="ban" value="1" />
+            <div>
+                <label>Reason: <input type="text" name="reason" class="ban-reason" /></label>
+            </div>
+        [%- END -%]
+        <input type="submit" name="confirm" value="Confirm" />
+    </form>
+    <form method="get">
+        <input type="submit" value="Cancel" />
+    </form>
+[%- END -%]
+</div>

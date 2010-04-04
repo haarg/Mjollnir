@@ -1,0 +1,4 @@
+<form method="get" class="player-control-button unban-button" action="/player/[% player.id %]">
+    <input type="hidden" name="unban" value="1" />
+    <input type="submit" value="Unban" />
+</form>

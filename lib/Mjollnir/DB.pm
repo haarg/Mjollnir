@@ -9,15 +9,11 @@ use File::ShareDir ();
 use File::Spec     ();
 use DBI;
 use DBD::SQLite;
-use constant DB_SCHEMA_VERSION => 2;
+use constant DB_SCHEMA_VERSION => 5;
 
-sub new {
-    my $class = shift;
-    my $self = bless {}, $class;
-
-    $self->{dbh} = $self->_init_dbh;
-    return $self;
-}
+@Mjollnir::DB::ISA = qw(DBI);
+@Mjollnir::DB::db::ISA = qw(DBI::db);
+@Mjollnir::DB::st::ISA = qw(DBI::st);
 
 sub db_filename {
     my $data_dir = File::ShareDir::dist_dir('Mjollnir');
@@ -25,31 +21,42 @@ sub db_filename {
     return $db_file;
 }
 
-sub _init_dbh {
-    my $self = shift;
-    my $db_file = $self->db_filename;
+sub new {
+    my $class = shift;
+
+    my $db_file = $class->db_filename;
     my $create = !-e $db_file;
-    my $dbh = DBI->connect( 'dbi:SQLite:' . $db_file, undef, undef, {
+    my $self = $class->connect( 'dbi:SQLite:' . $db_file, undef, undef, {
         PrintError => 0,
         RaiseError => 1,
     });
     if ($create) {
-        $self->_create($dbh);
-        $dbh->do('PRAGMA user_version = ' . DB_SCHEMA_VERSION);
+        $self->_create;
+        $self->do('PRAGMA user_version = ' . DB_SCHEMA_VERSION);
     }
     else {
-        my $current_db_version = $dbh->selectrow_array('PRAGMA user_version');
+        my $sql_dir = File::Spec->catdir(File::ShareDir::dist_dir('Mjollnir'), 'sql');
+        my $current_db_version = $self->selectrow_array('PRAGMA user_version');
         $current_db_version ||= 0;
         if ($current_db_version == DB_SCHEMA_VERSION) {
-            return $dbh;
+            return $self;
         }
         elsif ($current_db_version < DB_SCHEMA_VERSION) {
             for my $step ($current_db_version .. DB_SCHEMA_VERSION - 1) {
                 my $next_step = $step + 1;
-                my $filename = File::ShareDir::dist_file('Mjollnir', 'sql/upgrade-' . $step . '-' . $next_step . '.sql');
+                my $sql_script = File::Spec->catfile($sql_dir, 'upgrade-' . $step . '-' . $next_step . '.sql');
+                my $pl_script = File::Spec->catfile($sql_dir, 'upgrade-' . $step . '-' . $next_step . '.pl');
+                if (!-e $sql_script && !-e $pl_script) {
+                    die "Impossible to perform schema upgrade!\n";
+                }
                 print "Upgrading DB Schema to version $next_step...\n";
-                $self->_run_sql_script($dbh, $filename);
-                $dbh->do("PRAGMA user_version = $next_step");
+                if (-e $sql_script) {
+                    $self->_run_sql_script($sql_script);
+                }
+                if (-e $pl_script) {
+                    $self->_run_pl_script($pl_script);
+                }
+                $self->do("PRAGMA user_version = $next_step");
             }
         }
         else {
@@ -57,12 +64,13 @@ sub _init_dbh {
         }
     }
 
-    return $dbh;
+    return $self;
 }
+
+package Mjollnir::DB::db;
 
 sub _run_sql_script {
     my $self = shift;
-    my $dbh = shift;
     my $filename = shift;
     open my $fh, '<', $filename
         or die "Can't open $filename: $!";
@@ -70,229 +78,66 @@ sub _run_sql_script {
     close $fh;
     my @sql = grep { /\S/ } split /;$/msx, $sql;
     for my $stmt (@sql) {
-        eval { $dbh->do($stmt) } or die "$@: $stmt\n";
+        eval { $self->do($stmt) } or die "$@: $stmt\n";
     }
+    return 1;
+}
+
+sub _run_pl_script {
+    my $self = shift;
+    my $filename = shift;
+    package main;
+    local $::dbh = $self;
+    do $filename;
+    die $@ if $@;
     return 1;
 }
 
 sub _create {
     my $self = shift;
-    my $dbh  = shift;
     my $filename = File::ShareDir::dist_file('Mjollnir', 'sql/create.sql');
     return $self->_run_sql_script($filename);
 }
 
-sub dbh {
+sub get_ip_bans {
     my $self = shift;
-    return $self->{dbh};
-}
 
-sub get_names {
-    my $self = shift;
-    my $id   = shift;
-
-    my $dbh = $self->dbh;
-    my @names = map {@$_} @{
-        $dbh->selectall_arrayref(
-            'SELECT name FROM player_names WHERE steam_id = ? ORDER BY timestamp DESC',
-            {}, $id,
-        ) };
-    return \@names;
-}
-
-sub add_name {
-    my $self = shift;
-    my $id   = shift;
-    my $name = shift;
-
-    my $dbh = $self->dbh;
-    $dbh->do(
-        'INSERT OR REPLACE INTO player_names (steam_id, name, timestamp) VALUES (?, ?, ?)',
-        {}, $id, $name, time
-    );
-}
-
-sub get_ips {
-    my $self = shift;
-    my $id   = shift;
-
-    my $dbh = $self->dbh;
     my @ips = map {@$_} @{
-        $dbh->selectall_arrayref(
-            'SELECT ip FROM player_ips WHERE steam_id = ? ORDER BY timestamp DESC',
-            {}, $id,
-        ) };
+        $self->selectall_arrayref('SELECT ip FROM ip_bans ORDER BY timestamp DESC')
+    };
     return \@ips;
-}
-
-sub add_ip {
-    my $self = shift;
-    my $id   = shift;
-    my $ip   = shift;
-
-    my $dbh = $self->dbh;
-    $dbh->do(
-        'INSERT OR REPLACE INTO player_ips (steam_id, ip, timestamp) VALUES (?, ?, ?)',
-        {}, $id, $ip, time
-    );
-}
-
-sub check_banned_id {
-    my $self = shift;
-    my $id   = shift;
-
-    my $dbh = $self->dbh;
-    my $match =
-        $dbh->selectrow_array(
-            'SELECT COUNT(*) FROM id_bans WHERE steam_id = ?',
-            {}, $id, );
-    return $match;
 }
 
 sub check_banned_ip {
     my $self = shift;
     my $ip   = shift;
 
-    my $dbh = $self->dbh;
     my $match =
-        $dbh->selectrow_array( 'SELECT COUNT(*) FROM ip_bans WHERE ip = ?',
+        $self->selectrow_array( 'SELECT COUNT(*) FROM ip_bans WHERE ip = ?',
             {}, $ip, );
     return $match;
 }
 
-sub get_ip_bans {
+sub clear_ip_bans {
     my $self = shift;
 
-    my $dbh = $self->dbh;
-    my @ips = map {@$_} @{
-        $dbh->selectall_arrayref('SELECT ip FROM ip_bans ORDER BY timestamp DESC')
-    };
-    return \@ips;
-}
-
-sub get_id_bans {
-    my $self = shift;
-
-    my $dbh = $self->dbh;
-    my @ids = map {@$_} @{
-        $dbh->selectall_arrayref('SELECT steam_id FROM id_bans ORDER BY timestamp DESC')
-    };
-    return \@ids;
-}
-
-sub add_ip_ban {
-    my $self = shift;
-    my $ip   = shift;
-    my $id   = shift;
-    my $dbh  = $self->dbh;
-
-    my $row;
-    if ($id) {
-        $dbh->do(
-            'DELETE FROM ip_bans WHERE ip = ? AND steam_id = ?',
-            {}, $ip, $id, );
-    }
-    else {
-        $dbh->do(
-            'SELECT id FROM ip_bans WHERE ip = ? AND steam_id IS NULL',
-            {}, $ip, );
-    }
-    $dbh->do(
-        'INSERT INTO ip_bans (steam_id, ip, timestamp) VALUES (?, ?, ?)',
-        {}, $id, $ip, time
-    );
-}
-
-sub add_id_ban {
-    my $self = shift;
-    my $id   = shift;
-    my $dbh  = $self->dbh;
-
-    $dbh->do( 'INSERT OR REPLACE INTO id_bans (steam_id, timestamp) VALUES (?, ?)',
-        {}, $id, time );
-}
-
-sub get_id_for_ip {
-    my $self = shift;
-    my $ip   = shift;
-    my $dbh  = $self->dbh;
-
-    my $row = $dbh->selectrow_arrayref(
-        'SELECT steam_id FROM player_ips WHERE ip = ? ORDER BY timestamp DESC LIMIT 1',
-        {}, $ip,
-    );
-    return $row->[0]
-        if $row;
-    return;
-}
-
-sub get_latest_players {
-    my $self  = shift;
-    my $limit = shift // 18;
-    my $dbh   = $self->dbh;
-
-    my $names = $dbh->selectall_arrayref( <<"END_SQL", { Slice => {} } );
-    SELECT
-        steam_id,
-        name
-    FROM
-        player_names INNER JOIN (
-            SELECT
-                MAX(id) AS id
-            FROM
-                player_names
-            GROUP BY
-                steam_id
-            ORDER BY
-                MAX(timestamp) DESC, MAX(id) DESC
-            LIMIT $limit
-        ) ids ON player_names.id = ids.id
-END_SQL
-    my @steam_ids = map { $_->{steam_id} } @$names;
-
-    my $ips = $dbh->selectall_hashref( <<"END_SQL", 'steam_id', {}, @steam_ids );
-        SELECT
-            steam_id,
-            ip
-        FROM
-            player_ips INNER JOIN (
-                SELECT
-                    MAX(id) AS id
-                FROM
-                    player_ips
-                WHERE
-                    steam_id IN (@{[join ',', ('?') x @steam_ids]})
-                GROUP BY
-                    steam_id
-                ORDER BY
-                    MAX(timestamp) DESC, MAX(id) DESC
-                LIMIT $limit
-            ) ids ON player_ips.id = ids.id
-END_SQL
-
-    for my $player ( @{$names} ) {
-        $player->{ip} = $ips->{$player->{steam_id}}->{ip};
-        $player->{banned_id} = $self->check_banned_id( $player->{steam_id} );
-        $player->{banned_ip} = $self->check_banned_ip( $player->{ip} );
-    }
-    return $names;
+    $self->do('DELETE FROM ip_bans');
+    return 1;
 }
 
 sub add_name_ban {
     my $self = shift;
     my $name_pattern = shift;
-    my $dbh = $self->dbh;
 
-    $dbh->do( 'INSERT OR REPLACE INTO name_bans (name_pattern, timestamp) VALUES (?, ?)',
+    $self->do( 'INSERT OR REPLACE INTO name_bans (name_pattern, timestamp) VALUES (?, ?)',
         {}, $name_pattern, time );
 }
 
 sub get_name_bans {
     my $self = shift;
 
-    my $dbh = $self->dbh;
     my @names = map {@$_} @{
-        $dbh->selectall_arrayref('SELECT name_pattern FROM name_bans ORDER BY name_pattern ASC')
+        $self->selectall_arrayref('SELECT name_pattern FROM name_bans ORDER BY name_pattern ASC')
     };
     return \@names;
 }

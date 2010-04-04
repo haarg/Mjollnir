@@ -1,19 +1,47 @@
 [%- PROCESS header -%]
-        <h1>Mjöllnir - Player Info - [% id %]</h1>
-        [%- IF banned -%]
-        <h2>Banned by ID</h2>
-        [%- END -%]
-        <a href="[% community_link %]">Steam Community page</a>
-        <h2>Names:</h2>
-        <ul>
-        [%- FOREACH name IN names -%]
-            <li>[% name | format_name %]</li>
-        [%- END -%]
-        </ul>
-        <h2>IPs:</h2>
-        <ul>
-        [%- FOREACH ip IN ips -%]
-            <li>[% ip.ip %][% IF ip.banned; " - Banned"; END %]</li>
-        [%- END -%]
-        </ul>
+    <h1>Mjöllnir - Player Info - [% player.id %]</h1>
+    [%- IF param.unban -%]
+        <div class="unban-header">
+            <h2>Unban Player</h2>
+            [%- IF param.confirm -%]
+            [%- IF unban.result -%]
+                <h3>Player unbanned.</h3>
+            [%- ELSE -%]
+                <h3 class="error">Error unbanning player!</h3>
+            [%- END -%]
+            [%- ELSE -%]
+            <h3>Are you sure you want to proceed?</h3>
+            <form method="post" action="/player/[% player.id %]">
+                <input type="hidden" name="unban" value="1" />
+                <input type="submit" name="confirm" value="Confirm" />
+            </form>
+            <form method="get" action="/player/[% player.id %]">
+                <input type="submit" value="Cancel" />
+            </form>
+            [%- END -%]
+        </div>
+    [%- ELSIF player.is_banned -%]
+    <div class="unban-header">
+        <h2>Banned</h2>
+        <div>[%- INCLUDE unban_button -%]</div>
+    </div>
+    [%- ELSE -%]
+    <div>[%- INCLUDE ban_button -%]</div>
+    [%- END -%]
+    [%- IF player.vac_banned -%]
+    <h2>VAC Banned</h2>
+    [%- END -%]
+    <a href="[% player.community_link %]">Steam Community page</a>
+    <h2>Names:</h2>
+    <ul>
+    [%- FOREACH name IN player.names -%]
+        <li>[% name | format_name %]</li>
+    [%- END -%]
+    </ul>
+    <h2>IPs:</h2>
+    <ul>
+    [%- FOREACH ip IN player.ips -%]
+        <li>[% ip %][% IF check_banned_ip(ip); " - Banned"; END %]</li>
+    [%- END -%]
+    </ul>
 [%- PROCESS footer -%]

@@ -64,13 +64,6 @@ sub _start {
     my $pcap = $heap->{pcap}
         = Net::Pcap::open_live( $device, 10, 0, 0, \$err );
 
-    my $filter;
-    Net::Pcap::compile( $pcap, \$filter,
-        "udp and dst port 28960 and dst net $network/mask",
-        0, $mask_raw );
-    Net::Pcap::setfilter( $pcap, $filter );
-    $heap->{filter} = $filter;
-
     $heap->{timer} = $kernel->delay_set( 'poll', 0.5 );
     print "Monitoring network device:\n\t$device\n";
 }
@@ -79,7 +72,6 @@ sub shutdown {
     my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
     $kernel->alarm_remove(delete $heap->{timer});
     Net::Pcap::close(delete $heap->{pcap});
-    Net::Pcap::freecode(delete $heap->{filter});
     delete $heap->{target_session};
     print "Stopping network monitor.\n";
     return 1;
@@ -108,11 +100,15 @@ sub got_packet {
     return
         unless $ip->{proto} && $ip->{proto} == IP_PROTO_UDP;
     my $udp  = NetPacket::UDP->decode( $ip->{data} );
+    return
+        unless $udp->{dest_port} == 28960;
     my $data = $udp->{data};
-    return unless $data;
+    return
+        unless $data;
     if (not $data =~ s/\A\xff{4}//msx) {
         return;
     }
+    print "$ip->{dest_ip}\n";
     if ( $data =~ m{
         \A
         connect[ ][0-9a-f]+[ ]
@@ -166,6 +162,14 @@ sub got_packet {
                 name => $player_name,
             } );
     }
+}
+
+sub send_vote {
+    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+    print "sending vote\n";
+    my $pcap = $heap->{pcap};
+    my $data = "\xFF\xFF\xFF\xFF\xFF0veto 1\x00";
+#    Net::Pcap::sendpacket($pcap, $packet);
 }
 
 1;

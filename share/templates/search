@@ -1,0 +1,12 @@
+[%- PROCESS header -%]
+<h1>Search - [% param.q | html %]</h1>
+[%- IF players.size -%]
+    <ul>
+    [%- FOREACH player IN players -%]
+        <li><a href="/player/[% player.id %]">[% player.name | format_name %]</a>[% IF player.is_banned %] - Banned[% END %]</li>
+    [%- END -%]
+    </ul>
+[%- ELSE -%]
+    <h2>None found.</h2>
+[%- END -%]
+[%- PROCESS footer -%]

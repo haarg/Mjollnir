@@ -1,0 +1,5 @@
+<form method="get" class="player-control-button ban-button">
+    <input type="hidden" name="ban" value="1" />
+    <input type="hidden" name="kick" value="[% player.id %]" />
+    <input type="submit" value="Ban" />
+</form>

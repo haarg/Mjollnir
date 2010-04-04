@@ -1,0 +1,113 @@
+.kicked td {
+    text-decoration: line-through;
+}
+.kicked .col-control, .kicked .col-icon {
+    text-decoration: none;
+}
+.banned .ban-button, .banned form.kick-button {
+    display: none;
+}
+.kicked .kick-button {
+    display: inline;
+    visibility: hidden;
+}
+.player-list .unban-button {
+    display: none;
+}
+.player-list .banned .unban-button {
+    display: inline;
+}
+.kick-header {
+    margin: 0 auto 1em;
+    padding: 0.5em;
+    border: 1px solid #000;
+    width: 40em;
+    text-align: center;
+}
+.ban-reason {
+    width: 33em;
+}
+.unban-header {
+    margin: 0 auto 1em;
+    padding: 0.5em;
+    border: 1px solid #000;
+    width: 20em;
+    text-align: center;
+}
+
+.player-list {
+    width: 700px;
+    color: #ffffff;
+    background-color: #606060;
+}
+.player-list th {
+    border-bottom: 2px solid #000;
+}
+.player-list td {
+    border-bottom: 1px solid #000;
+}
+.player-list a, .player-list a:link, .player-list a:active, .player-list a:visited {
+    color: #fff;
+}
+.col-icon {
+    width: 20px;
+}
+.col-ip {
+    width: 100px;
+}
+.col-player {
+    width: auto;
+}
+.col-control {
+    width: 150px;
+    text-align: center;
+}
+.header-bar {
+    background-color: #000;
+    text-align: center;
+    padding: 10px;
+}
+.header-bar, .header-bar a, .header-bar a:link, .header-bar a:active, .header-bar a:visited {
+    color: #ffffff;
+}
+a, a:link, a:active {
+    color: #ffffff;
+}
+a:visited {
+    color: #c0c0c0;
+}
+body {
+    margin: 0;
+    padding: 0;
+    font: 10pt 'Trebuchet MS', 'Segoe UI', Tahoma, verdana, geneva, lucida, 'lucida grande', arial, helvetica, sans-serif;
+    background-color: #606060;
+    color: #ffffff;
+}
+.even {
+    background-color: #585858;
+}
+.odd {
+    background-color: #686868;
+}
+.content {
+    padding: 0 10px;
+}
+.header-bar .search-form {
+    float: right;
+}
+.header-bar .search-form .search-box {
+    width: 20em;
+}
+form {
+    display: inline;
+}
+.name-color-black  { color: #000000 }
+.name-color-red    { color: #ff2020 }
+.name-color-green  { color: #00ff00 }
+.name-color-yellow { color: #ffff00 }
+.name-color-blue   { color: #0000ff }
+.name-color-cyan   { color: #00ffff }
+.name-color-pink   { color: #ff80ff }
+.name-color-white  { color: #ffffff }
+.name-color-grey   { color: #808080 }
+.name-color-other  { color: #000000 }

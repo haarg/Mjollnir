@@ -1,0 +1,4 @@
+<form method="get" class="player-control-button kick-button">
+    <input type="hidden" name="kick" value="[% player.id %]" />
+    <input type="submit" value="Kick" />
+</form>

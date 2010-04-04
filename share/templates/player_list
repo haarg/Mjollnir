@@ -3,25 +3,13 @@
         <tr><th class="col-icon"></th><th class="col-player">Player</th><th class="col-ip">IP</th><th class="col-control">Control</th></tr>
     </thead>
     <tbody>
-[%- FOREACH player IN player_list -%]
-        <tr class="[% IF player.banned_id %]banned banned-id[% ELSIF player.banned_ip %]banned banned-ip[% END %]">
-            <td class="col-icon">[% IF player.banned_id %]X[% ELSIF player.banned_ip %]*[% END %]</th>
-            <td class="col-player"><a href="/player/[% player.steam_id %]">[% player.name | format_name %]</a></td>
+[%- FOREACH player IN players -%]
+        <tr class="[% IF player.is_banned %]banned kicked[% ELSIF player.is_kicked %]kicked[% END %] [% loop.parity %]">
+            <td class="col-icon">[% IF player.is_banned %]X[% ELSIF player.is_kicked %]*[% END %]</th>
+            <td class="col-player"><a href="/player/[% player.id %]">[% player.name | format_name %]</a></td>
             <td class="col-ip">[% player.ip %]</th>
-            <td class="col-control">[% INCLUDE ban_button id = player.steam_id %][% INCLUDE ban_button ip = player.ip %]</td>
+            <td class="col-control">[% PROCESS ban_button %][% PROCESS kick_button %][% PROCESS unban_button %]</td>
         </tr>
 [%- END -%]
     </tbody>
 </table>
-
-[%- BLOCK ban_button -%]
-<form method="get" class="ban-button ban-button-[% IF ip ; "ip" ; ELSE ; "id" ; END %]">
-    <input type="hidden" name="op" value="ban" />
-[%- IF ip -%]
-    <input type="hidden" name="ip" value="[% ip %]" />
-[%- ELSE -%]
-    <input type="hidden" name="id" value="[% id %]" />
-[%- END -%]
-    <input type="submit" value="Ban [% IF ip ; "IP" ; ELSE ; "ID" ; END %]" />
-</form>
-[%- END -%]
