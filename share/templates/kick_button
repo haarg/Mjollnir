@@ -1,4 +1,4 @@
-<form method="get" class="player-control-button kick-button">
+<form method="get" class="player-control-button kick-button" action="/">
     <input type="hidden" name="kick" value="[% player.id %]" />
     <input type="submit" value="Kick" />
 </form>

@@ -108,7 +108,6 @@ sub got_packet {
     if (not $data =~ s/\A\xff{4}//msx) {
         return;
     }
-    print "$ip->{dest_ip}\n";
     if ( $data =~ m{
         \A
         connect[ ][0-9a-f]+[ ]

@@ -22,14 +22,38 @@ sub new {
     return $self;
 }
 
+sub _db_read {
+    my $self = shift;
+    my $db = $self->{db};
+    @{$self}{qw(banned ban_reason ban_timestamp vac_banned web_timestamp)} = $db->selectrow_array(
+        'SELECT banned, ban_reason, ban_timestamp, vac_banned, web_timestamp FROM player WHERE steam_id = ?',
+        {}, $self->id);
+    return 1;
+}
+
+sub _db_write {
+    my $self = shift;
+    my $db = $self->{db};
+    $db->do('INSERT OR REPLACE INTO player (steam_id, banned, ban_reason, ban_timestamp, vac_banned, web_timestamp) VALUES (?,?,?,?,?,?)',
+        {}, $self->id, @{$self}{qw(banned ban_reason ban_timestamp vac_banned web_timestamp)});
+}
+
 sub is_banned {
     my $self = shift;
     my $db = $self->{db};
-    my $match =
-        $db->selectrow_array(
-            'SELECT COUNT(*) FROM id_bans WHERE steam_id = ?',
-            {}, $self->id );
-    return $match;
+    if (!exists $self->{banned}) {
+        $self->_db_read;
+    }
+    return $self->{banned};
+}
+
+sub ban_reason {
+    my $self = shift;
+    my $db = $self->{db};
+    if (!exists $self->{ban_reason}) {
+        $self->_db_read;
+    }
+    return $self->{ban_reason};
 }
 
 sub is_kicked {
@@ -46,20 +70,28 @@ sub is_name_banned {
 }
 
 sub ban {
-    my $self = shift;
-    my $db   = $self->{db};
-
-    $db->do( 'INSERT OR REPLACE INTO id_bans (steam_id, timestamp) VALUES (?, ?)',
-        {}, $self->id, time );
+    my $self   = shift;
+    my $reason = shift;
+    my $db     = $self->{db};
+    $self->_db_read;
+    $self->{banned} = 1;
+    $self->{ban_reason} = $reason;
+    $self->{ban_timestamp} = time;
+    $self->_db_write;
+    $self->kick;
     return 1;
 }
 
 sub unban {
     my $self = shift;
     my $db   = $self->{db};
-
-    $db->do( 'DELETE FROM id_bans WHERE steam_id = ?', {}, $self->id);
-    $db->do( 'DELETE FROM ip_bans WHERE ip = ?', {}, $self->ip);
+    $self->_db_read;
+    $self->{banned} = 0;
+    $self->{ban_reason} = undef;
+    $self->{ban_timestamp} = undef;
+    $self->_db_write;
+    $db->clear_ip_bans;
+    Mjollnir::IPBan::clear_bans();
     return 1;
 }
 
@@ -111,21 +143,32 @@ sub add_ip {
     return 1;
 }
 
-sub names {
+sub _load_name {
     my $self = shift;
     my $db = $self->{db};
-    my @names = map {@$_} @{
-        $db->selectall_arrayref(
-            'SELECT name FROM player_names WHERE steam_id = ? ORDER BY timestamp DESC',
-            {}, $self->id,
-        ) };
-    return wantarray ? @names : \@names;
+    if (!defined $self->{name}) {
+        $self->{name} = $db->selectrow_array(
+            'SELECT name FROM player_names WHERE steam_id = ? ORDER BY timestamp DESC LIMIT 1',
+            {}, $self->id
+        );
+    }
+    if (!defined $self->{stripped_name}) {
+        $self->{stripped_name} = $self->{name};
+        $self->{stripped_name} =~ s/\^\d//g;
+    }
+    return 1;
 }
 
 sub name {
     my $self = shift;
     $self->_load_name;
     return $self->{name};
+}
+
+sub stripped_name {
+    my $self = shift;
+    $self->_load_name;
+    return $self->{stripped_name};
 }
 
 sub add_name {
@@ -145,52 +188,18 @@ sub add_name {
         'INSERT OR REPLACE INTO player_names (steam_id, name, stripped_name, timestamp) VALUES (?, ?, ?, ?)',
         {}, $self->id, $name, $stripped_name, time
     );
-    $self->updated(time);
     return 1;
 }
 
-sub updated {
-    my $self = shift;
-    my $when = shift;
-    my $db = $self->{db};
-    if ($when) {
-        $self->{updated} = $when;
-        $db->do(
-            'INSERT OR REPLACE INTO player_ids (steam_id, timestamp) VALUES (?, ?)',
-            {}, $self->id, $when
-        );
-    }
-    elsif ($self->{updated}) {
-        return $self->{updated};
-    }
-    else {
-        return $self->{updated} = $db->selectrow_array(
-            'SELECT timestamp FROM player_ids WHERE steam_id = ?',
-            {}, $self->id
-        );
-    }
-}
-
-sub _load_name {
+sub names {
     my $self = shift;
     my $db = $self->{db};
-    if (!defined $self->{name}) {
-        $self->{name} = $db->selectrow_array(
-            'SELECT name FROM player_names WHERE steam_id = ? ORDER BY timestamp DESC LIMIT 1',
-            {}, $self->id
-        );
-    }
-    if (!defined $self->{stripped_name}) {
-        $self->{stripped_name} = $self->{name};
-        $self->{stripped_name} =~ s/\^\d//g;
-    }
-    return 1;
-}
-
-sub stripped_name {
-    my $self = shift;
-    $self->_load_name;
-    return $self->{stripped_name};
+    my @names = map {@$_} @{
+        $db->selectall_arrayref(
+            'SELECT name FROM player_names WHERE steam_id = ? ORDER BY timestamp DESC',
+            {}, $self->id,
+        ) };
+    return wantarray ? @names : \@names;
 }
 
 sub stripped_names {
@@ -202,6 +211,19 @@ sub stripped_names {
             {}, $self->id,
         ) };
     return wantarray ? @stripped_names : \@stripped_names;
+}
+
+sub updated {
+    my $self = shift;
+    my $db = $self->{db};
+    if (! exists $self->{web_timestamp}) {
+        $self->_db_read;
+    }
+    if (@_) {
+        $self->{web_timestamp} = shift;
+        $self->_db_write;
+    }
+    return $self->{web_timestamp};
 }
 
 sub id {
@@ -237,22 +259,12 @@ sub refresh {
 sub vac_banned {
     my $self = shift;
     my $db = $self->{db};
+    $self->_db_read;
     if (@_) {
         $self->{vac_banned} = shift;
-        $db->do(
-            'UPDATE player_ids SET vac_banned = ? WHERE steam_id = ?',
-            {}, $self->{vac_banned}, $self->id
-        );
+        $self->_db_write;
     }
-    if (exists $self->{vac_banned}) {
-        return $self->{vac_banned};
-    }
-    else {
-        return $self->{vac_banned} = $db->selectrow_array(
-            'SELECT vac_banned FROM player_ids WHERE steam_id = ?',
-            {}, $self->id
-        );
-    }
+    return $self->{vac_banned};
 }
 
 sub update_from_web {
@@ -263,9 +275,8 @@ sub update_from_web {
     if ($data->{player_name}) {
         $self->add_name( $data->{player_name} );
     }
-    if ($data->{vac_banned}) {
-        $self->vac_banned(1);
-    }
+    $self->vac_banned($data->{vac_banned});
+    $self->updated(time);
     return 1;
 }
 
@@ -284,9 +295,8 @@ sub new_by_link {
         if ($player && $data->{player_name}) {
             $player->add_name( $data->{player_name} );
         }
-        if ($data->{vac_banned}) {
-            $player->vac_banned(1);
-        }
+        $player->vac_banned($data->{vac_banned});
+        $player->updated(time);
         return $player;
     }
     return;
@@ -302,7 +312,7 @@ sub _xml_info {
     return {
         player_name => $xml->getElementsByTagName('steamID')->[0]->textContent,
         community_id => $xml->getElementsByTagName('steamID64')->[0]->textContent,
-        vac_banned => $xml->getElementsByTagName('vacBanned')->[0]->textContent,
+        vac_banned => $xml->getElementsByTagName('vacBanned')->[0]->textContent ? 1 : 0,
     };
 }
 
@@ -423,7 +433,7 @@ sub find_banned {
     my $class = shift;
     my $db   = shift;
     
-    my $players = $db->selectall_arrayref('SELECT steam_id FROM id_bans ORDER BY timestamp DESC', { Slice => {} });
+    my $players = $db->selectall_arrayref('SELECT steam_id FROM player WHERE banned ORDER BY ban_timestamp DESC', { Slice => {} });
     for my $player ( @{ $players } ) {
         $player->{db} = $db;
         bless $player, $class;

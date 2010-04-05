@@ -73,26 +73,30 @@ sub clear_ip_bans {
 
 sub player_join {
     my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-    my $player = Mjollnor::Player->new($heap->{db}, $data->{steam_id});
+    my $player = Mjollnir::Player->new($heap->{db}, $data->{steam_id});
     $player->add_name( $data->{name} );
     $player->add_ip( $data->{ip} );
     $kernel->yield(check_user => $player);
-    print "join\t$data->{steam_id}\t$data->{ip}\t$data->{name}\n";
+    print join("\t", time, 'join', $player->id, $player->ip, $player->name) . "\n";
 }
 
 sub player_ident {
     my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-    my $player = Mjollnor::Player->new_by_ip($heap->{db}, $data->{ip});
+    my $player = Mjollnir::Player->new_by_ip($heap->{db}, $data->{ip});
     my $id = $player->id;
     $player->add_name( $data->{name} );
     $kernel->yield(check_user => $player);
-    print "ident\t$id\t$data->{ip}\t$data->{name}\n";
+    print join("\t", time, 'ident', $player->id, $player->ip, $player->name) . "\n";
 }
 
 sub check_user {
     my ( $kernel, $heap, $player ) = @_[ KERNEL, HEAP, ARG0 ];
+    $player->refresh;
     if ( $player->is_banned || $player->is_name_banned ) {
         $player->kick;
+    }
+    elsif ( $player->vac_banned ) {
+        $player->ban('VAC banned');
     }
 }
 

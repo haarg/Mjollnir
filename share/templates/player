@@ -22,7 +22,7 @@
         </div>
     [%- ELSIF player.is_banned -%]
     <div class="unban-header">
-        <h2>Banned</h2>
+        <h2>Banned[% IF player.ban_reason %] - [% player.ban_reason | html %][% END %]</h2>
         <div>[%- INCLUDE unban_button -%]</div>
     </div>
     [%- ELSE -%]

@@ -1,5 +1,11 @@
 [%- PROCESS header -%]
         <h1>Mjöllnir - Bans</h1>
+[%- IF name_ban.result -%]
+        <h2>Added [% name_ban.name | html %] to name bans.</h3>
+[%- END -%]
+[%- IF name_unban.result -%]
+        <h2>Removed [% name_unban.name | html %] from name bans.</h3>
+[%- END -%]
         <h2>Banned Players</h2>
         <ul>
         [%- FOREACH player IN players -%]
@@ -9,9 +15,16 @@
         <h2>Name Bans</h2>
         <ul>
         [%- FOREACH name IN names -%]
-            <li>[% name | html %]</li>
+            <li>[% name | html %] - <form method="post">
+                <input type="hidden" name="unban_name" value="[% name | html %]" />
+                <input type="submit" value="Unban" />
+            </form></li>
         [%- END -%]
         </ul>
+        <form method="post">
+            <input type="text" name="ban_name" />
+            <input type="submit" value="Add Name Ban" />
+        </form>
         <h2>Blocked IPs</h2>
         <ul>
         [%- FOREACH ip IN ips -%]

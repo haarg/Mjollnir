@@ -1,18 +1,22 @@
 PRAGMA auto_vacuum = FULL;
 
-CREATE TABLE id_bans (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    steam_id TEXT,
-    timestamp INTEGER
-);
-CREATE UNIQUE INDEX id_bans_sid ON id_bans (steam_id);
-
 CREATE TABLE ip_bans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ip TEXT,
     timestamp INTEGER
 );
 CREATE UNIQUE INDEX ip_bans_ip ON ip_bans (ip);
+
+CREATE TABLE player (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    steam_id TEXT,
+    banned  INTEGER,
+    ban_reason INTEGER,
+    ban_timestamp INTEGER,
+    vac_banned INTEGER,
+    web_timestamp INTEGER
+);
+CREATE UNIQUE INDEX player_sid ON player (steam_id);
 
 CREATE TABLE player_names (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

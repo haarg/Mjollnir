@@ -9,7 +9,7 @@ use File::ShareDir ();
 use File::Spec     ();
 use DBI;
 use DBD::SQLite;
-use constant DB_SCHEMA_VERSION => 5;
+use constant DB_SCHEMA_VERSION => 7;
 
 @Mjollnir::DB::ISA = qw(DBI);
 @Mjollnir::DB::db::ISA = qw(DBI::db);
@@ -133,6 +133,15 @@ sub add_name_ban {
         {}, $name_pattern, time );
 }
 
+sub remove_name_ban {
+    my $self = shift;
+    my $name_pattern = shift;
+
+    $self->do( 'DELETE FROM name_bans WHERE name_pattern = ?',
+        {}, $name_pattern );
+    return 1;
+}
+
 sub get_name_bans {
     my $self = shift;
 
@@ -146,12 +155,8 @@ sub check_banned_name {
     my $self = shift;
     my $name = shift;
 
-    my $bans = $self->get_name_bans;
-    for my $banned_name ( @{ $bans } ) {
-        if ($name =~ /$banned_name/) {
-            return 1;
-        }
-    }
+    my $match = $self->selectrow_array('SELECT COUNT(*) FROM ? REGEX name_pattern', {}, $name);
+
     return;
 }
 

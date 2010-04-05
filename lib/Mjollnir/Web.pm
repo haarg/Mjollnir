@@ -124,7 +124,7 @@ sub www_main {
         my $player = $kick_data->{player} = Mjollnir::Player->new($db, $id);
         if ( $param->{confirm} ) {
             $kick_data->{result}
-                = $param->{ban} ? $player->ban(reason => $param->{reason})
+                = $param->{ban} ? $player->ban($param->{reason})
                                 : $player->kick
                                 ;
         }
@@ -176,11 +176,19 @@ sub www_bans {
     $res->content_type('text/html; charset=utf-8');
 
     my $db = $self->db;
-    my $vars = {
-        ips     => scalar $db->get_ip_bans,
-        players => scalar Mjollnir::Player->find_banned($db),
-        names   => scalar $db->get_name_bans,
-    };
+
+    my $vars = {};
+    if ( $param->{ban_name} ) {
+        $vars->{name_ban}{result} = $db->add_name_ban($param->{ban_name});
+        $vars->{name_ban}{name} = $param->{ban_name};
+    }
+    if ( $param->{unban_name} ) {
+        $vars->{name_unban}{result} = $db->remove_name_ban($param->{unban_name});
+        $vars->{name_unban}{name} = $param->{unban_name};
+    }
+    $vars->{players} = Mjollnir::Player->find_banned($db);
+    $vars->{ips}     = $db->get_ip_bans;
+    $vars->{names}   = $db->get_name_bans;
 
     $res->body( $self->process_template( 'bans', $vars ) );
     return $res->finalize;
@@ -243,16 +251,6 @@ sub db {
     return POE::Kernel->call( $self->{manager}, 'db' );
 }
 
-sub ban_id {
-    my $self = shift;
-    return POE::Kernel->call( $self->{manager}, 'ban_id', @_ );
-}
-
-sub ban_ip {
-    my $self = shift;
-    return POE::Kernel->call( $self->{manager}, 'ban_ip', @_ );
-}
-
 sub process_template {
     my $self = shift;
     my $template = shift;
@@ -268,7 +266,8 @@ sub process_template {
     }
     else {
         my $content = '';
-        $self->{template}->process( $template, $vars, \$content );
+        $self->{template}->process( $template, $vars, \$content )
+            or die $self->{template}->error;
         return $content;
     }
 }
