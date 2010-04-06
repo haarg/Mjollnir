@@ -1,9 +1,14 @@
+!tempfile DISTPARAM
 !system 'cd .. && Build.bat distclean'
 !system 'cd .. && perl Build.PL'
 !system 'cd .. && Build.bat manifest'
 !system 'cd .. && Build.bat distdir'
-!searchparse /file ../_build/build_params "'dist_name' => '" DISTNAME "'"
-!searchparse /file ../_build/build_params "'dist_version' => '" DISTVERSION "'"
+!system 'perl -MParse::CPAN::Meta=LoadFile -e"print LoadFile(shift)->{name}" ..\META.yml > ${DISTPARAM}'
+!define /file DISTNAME ${DISTPARAM}
+!system 'perl -MParse::CPAN::Meta=LoadFile -e"print LoadFile(shift)->{version}" ..\META.yml > ${DISTPARAM}'
+!define /file DISTVERSION ${DISTPARAM}
+!delfile ${DISTPARAM}
+!undef DISTPARAM
 
 !define DISTDIR "..\${DISTNAME}-${DISTVERSION}"
 
