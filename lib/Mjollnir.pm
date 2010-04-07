@@ -11,6 +11,7 @@ use Mjollnir::Web;
 use Mjollnir::DB;
 use Mjollnir::IPBan;
 use Mjollnir::Player;
+use POSIX ();
 
 sub new {
     my $class = shift;
@@ -44,7 +45,7 @@ sub start {
     )->start;
     $self->{web_server} = Mjollnir::Web->new(
         %{ $self->{config} },
-        db  => $self->db,
+        db => $self->db,
     )->start;
 
     $self->clear_ip_bans;
@@ -93,7 +94,7 @@ sub player_action {
         $player->add_ip( $data->{ip} );
     }
     $player->validate;
-    print join("\t", time, $data->{action}, $player->id, $player->ip, $player->name) . "\n";
+    print join("\t", ('[net] ' . POSIX::strftime "%d/%b/%Y %H:%M:%S", localtime), $data->{action}, $player->id, $player->ip, $player->name) . "\n";
 }
 
 1;
