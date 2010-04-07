@@ -12,19 +12,11 @@ use NetPacket::Ethernet qw(:types);
 use NetPacket::IP qw(:protos);
 use NetPacket::UDP;
 
-sub get_devices {
-    my %devinfo;
-    my $err;
-    my @devs = Net::Pcap::findalldevs( \%devinfo, \$err );
-    return %devinfo;
-}
-
 sub detect_default_device {
-    eval { require Mjollnir::NetInfo }
-        or die "Unable to detect network info.\n";
-    my $ip = Mjollnir::NetInfo::get_local_ip();
-    my $device = Mjollnir::NetInfo::get_device_for_ip($ip);
-    return $device;
+    return eval {
+        require Mjollnir::NetInfo;
+        Mjollnir::NetInfo->get_default_device;
+    } || die "Unable to detect network info. $@\n";
 }
 
 sub new {
@@ -32,7 +24,7 @@ sub new {
     my $options = (@_ == 1 && ref $_[0]) ? shift : { @_ };
     my $self = bless {}, $class;
     $self->{callback} = $options->{callback} // sub {};
-    $self->{device}   = $options->{device} // $self->detect_default_device();
+    $self->{device}   = $options->{device} // $self->detect_default_device;
     return $self;
 }
 
@@ -89,6 +81,7 @@ sub _init_pcap {
 
     my $filter_string = "udp and dst port 28960 and dst net $network/$mask";
     my $filter;
+    # filters are broken
     #Net::Pcap::compile( $pcap, \$filter, $filter_string, 0, $netmask );
     #Net::Pcap::setfilter( $pcap, $filter );
     $self->{filter} = $filter;
@@ -120,21 +113,21 @@ sub handle_packets {
         my $packet = shift;
 
         my $ether = NetPacket::Ethernet->decode($packet);
-        return
+        next
             unless $ether->{type} && $ether->{type} == ETH_TYPE_IP;
         my $ip = NetPacket::IP->decode( $ether->{data} );
-        return
+        next
             unless $ip->{proto} && $ip->{proto} == IP_PROTO_UDP;
         my $udp = NetPacket::UDP->decode( $ip->{data} );
-        return
+        next
             unless $udp->{dest_port} == 28960;
         my $data = $udp->{data};
-        return
+        next
             unless $data;
 
         # check for OOB packet marker
         if (not $data =~ s/\A\xff{4}//msx) {
-            return;
+            next;
         }
 
         $self->parse_packet($ip, $data);
