@@ -9,8 +9,6 @@ my $build = Module::Build->new(
     requires => {
         'perl'                          => 5.010,
         'Cwd'                           => 0,
-        'File::Basename'                => 0,
-        'File::Find'                    => 0,
         'File::ShareDir'                => 0,
         'File::Spec'                    => 0,
 
@@ -20,9 +18,6 @@ my $build = Module::Build->new(
         'DBD::SQLite'                   => 0,
 
         'Net::Netmask'                  => 0,
-        'Net::Route::Table'             => 0,
-        'DBD::WMI'                      => 0,
-
         'Socket'                        => 0,
         'Net::Pcap'                     => 0,
         'NetPacket::Ethernet'           => 0,
@@ -30,9 +25,17 @@ my $build = Module::Build->new(
         'NetPacket::UDP'                => 0,
 
         'Plack::Request'                => 0,
-        'Twiggy'                        => 0,
-        'Template'                      => 0,
+        'Plack::MIME'                   => 0,
+        'Plack::App::File'              => 0,
+        'Plack::Middleware::ConditionalGET' => 0,
+        'Plack::Middleware::StackTrace' => 0,
+        'Plack::Middleware::AccessLog'  => 0,
 
+        'Twiggy::Server'                => 0,
+        'Template'                      => 0,
+    },
+    build_requires => {
+        'File::Find'                    => 0,
         'Test::More'                    => 0,
     },
 );
