@@ -81,6 +81,7 @@ Section ""
     ExecWait '"$PLUGINSDIR\winpcap-nmap-4.11.exe" /S'
     nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe C:\strawberry\perl\bin\ppm.pl install Net::Pcap'
     nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe -MCPAN -e notest(@ARGV) install .'
-    
-    CreateShortcut "$DESKTOP\Mjollnir.lnk" C:\strawberry\perl\bin\perl.exe C:\strawberry\perl\bin\mjollnir.pl "$SYSDIR\shell32.dll" 10
+
+    SetOutDir $SYSDIR
+    CreateShortcut "$DESKTOP\Mjollnir.lnk" C:\strawberry\perl\bin\perl.exe "C:\strawberry\perl\bin\mjollnir.pl --respawn" "$SYSDIR\shell32.dll" 10
 SectionEnd
