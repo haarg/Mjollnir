@@ -1,24 +1,18 @@
-package Mjollnir::IPBan::ipseccmd;
+package Mjollnir::IPBan::Debug;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.01;
 
 sub ban_ip {
     my $class = shift;
     my $ip = shift;
-    my $output = `ipseccmd -n BLOCK -f $ip+0:28960:UDP 2>&1`;
-    if ($output =~ /error/) {
-        return;
-    }
+    warn "Banning IP $ip.\n";
     return 1;
 }
 
 sub clear_bans {
-    my $output = `ipseccmd -u 2>&1`;
-    if ($output =~ /error/) {
-        return;
-    }
+    warn "Clearing IP bans.\n";
     return 1;
 }
 
@@ -28,7 +22,7 @@ __END__
 
 =head1 NAME
 
-Mjollnir::IPBan::ipseccmd - IP banning controls using ipseccmd.exe
+Mjollnir::IPBan::Debug - Fake IP banning controls
 
 =head1 AUTHOR
 

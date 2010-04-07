@@ -2,13 +2,10 @@ package Mjollnir::IPBan::netsh;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
-
-use Exporter qw(import);
-
-our @EXPORT = qw(ban_ip clear_bans);
+our $VERSION = 0.02;
 
 sub ban_ip {
+    my $class = shift;
     my $ip = shift;
 
     my $output = `netsh -c "advfirewall firewall" add rule name="Mjollnir Block Out $ip" dir=out action=block remoteip=$ip protocol=udp localport=28960 2>&1`;
@@ -45,7 +42,7 @@ Graham Knop <haarg@haarg.org>
 =head1 LICENSE
 
 Copyright (c) 2010, Graham Knop
- 
+
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl 5.10.0. For more details, see the
 full text of the licenses in the directory LICENSES.
