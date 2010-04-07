@@ -13,23 +13,26 @@ my $build = Module::Build->new(
         'File::Find'                    => 0,
         'File::ShareDir'                => 0,
         'File::Spec'                    => 0,
+
+        'AnyEvent'                      => 0,
+
         'DBI'                           => 0,
         'DBD::SQLite'                   => 0,
-        'DBD::WMI'                      => 0,
-        'Socket'                        => 0,
+
         'Net::Netmask'                  => 0,
-        'Net::Pcap'                     => 0,
         'Net::Route::Table'             => 0,
+        'DBD::WMI'                      => 0,
+
+        'Socket'                        => 0,
+        'Net::Pcap'                     => 0,
         'NetPacket::Ethernet'           => 0,
         'NetPacket::IP'                 => 0,
         'NetPacket::UDP'                => 0,
-        'POE'                           => 0,
-        'POE::Kernel'                   => 0,
-        'POE::Session'                  => 0,
-        'POE::Wheel::FollowTail'        => 0,
+
         'Plack::Request'                => 0,
-        'POE::Component::Server::PSGI'  => 0,
+        'Twiggy'                        => 0,
         'Template'                      => 0,
+
         'Test::More'                    => 0,
     },
 );

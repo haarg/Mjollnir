@@ -3,111 +3,97 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = 0.03;
+our $VERSION = 0.04;
 
-use POE;
-use POE::Kernel;
+use AnyEvent;
 use Mjollnir::Monitor;
 use Mjollnir::Web;
 use Mjollnir::DB;
 use Mjollnir::IPBan;
 use Mjollnir::Player;
 
-sub create {
-    my $class  = shift;
-
-    return POE::Session->create(
-        package_states => [
-            $class => [ qw(
-                _start
-                shutdown
-                exit_signal
-                player_join
-                player_ident
-                db
-                clear_ip_bans
-            ) ],
-            $class => { player_connect => 'player_join' },
-        ],
-        args => [@_],
-    );
-}
-
-sub _start {
-    my ( $kernel, $heap, %config ) = @_[ KERNEL, HEAP, ARG0..$#_ ];
-    print "Starting Mjollnir...\n";
-    $heap->{db}             = Mjollnir::DB->new;
-
-    $heap->{net_monitor}    = Mjollnir::Monitor->spawn($config{device});
-    $heap->{web_server}     = Mjollnir::Web->spawn($config{listen});
-
-    for my $sig (qw(INT QUIT TERM HUP)) {
-        $kernel->sig($sig, 'exit_signal');
-    }
-    $kernel->yield('clear_ip_bans');
-}
-
-sub exit_signal {
-    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-    $kernel->sig_handled;
-    for my $sig (qw(INT QUIT TERM HUP)) {
-        $kernel->sig($sig);
-    }
-    $kernel->yield('shutdown');
-}
-
-sub shutdown {
-    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-    print "Shutting down...\n";
-    for my $child (qw(net_monitor web_server)) {
-        $kernel->call(delete $heap->{$child}, 'shutdown')
-    }
-    $kernel->yield('clear_ip_bans');
-}
-
-sub clear_ip_bans {
-    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-    $heap->{db}->clear_ip_bans;
-    return Mjollnir::IPBan::clear_bans();
-}
-
-sub player_join {
-    my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-    my $player = Mjollnir::Player->new($heap->{db}, $data->{steam_id});
-    $player->add_name( $data->{name} );
-    $player->add_ip( $data->{ip} );
-    $kernel->yield(check_user => $player);
-    print join("\t", time, 'join', $player->id, $player->ip, $player->name) . "\n";
-}
-
-sub player_ident {
-    my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-    my $player = Mjollnir::Player->new_by_ip($heap->{db}, $data->{ip});
-    my $id = $player->id;
-    $player->add_name( $data->{name} );
-    $kernel->yield(check_user => $player);
-    print join("\t", time, 'ident', $player->id, $player->ip, $player->name) . "\n";
-}
-
-sub check_user {
-    my ( $kernel, $heap, $player ) = @_[ KERNEL, HEAP, ARG0 ];
-    $player->refresh;
-    if ( $player->is_banned || $player->is_name_banned ) {
-        $player->kick;
-    }
-    elsif ( $player->vac_banned ) {
-        $player->ban('VAC banned');
-    }
+sub new {
+    my $class = shift;
+    my $options  = (@_ == 1 && ref $_[0]) ? shift : { @_ };
+    my $self = bless {
+        config => $options,
+    }, $class;
+    return $self;
 }
 
 sub run {
-    shift->create(@_);
-    POE::Kernel->run;
+    my $self = ref $_[0] ? shift : shift->new(@_);
+    return $self->start->recv;
+}
+
+sub start {
+    my $self = shift;
+    print "Starting Mjollnir...\n";
+
+    $self->{signal_watchers} = {};
+    for my $sig (qw(INT QUIT TERM HUP)) {
+        $self->{signal_watchers}{$sig} = AnyEvent->signal(
+            signal  => $sig,
+            cb      => sub { $self->shutdown },
+        );
+    }
+
+    $self->{net_monitor} = Mjollnir::Monitor->new(
+        %{ $self->{config} },
+        callback => sub { $self->player_action(@_) },
+    )->start;
+    $self->{web_server} = Mjollnir::Web->new(
+        %{ $self->{config} },
+        db  => $self->db,
+    )->start;
+
+    $self->clear_ip_bans;
+
+    $self->{cv} = AnyEvent->condvar;
+    return $self->{cv};
+}
+
+sub shutdown {
+    my $self = shift;
+    print "Shutting down...\n";
+    delete $self->{signal_watchers};
+    delete $self->{net_monitor};
+    delete $self->{web_server};
+    $self->clear_ip_bans;
+    $self->{cv}->send;
 }
 
 sub db {
-    my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-    return $heap->{db};
+    my $self = shift;
+    $self->{db} ||= Mjollnir::DB->new($self->{config});
+    return $self->{db};
+}
+
+sub clear_ip_bans {
+    my $self = shift;
+    $self->db->clear_ip_bans;
+    Mjollnir::IPBan::clear_bans();
+    return 1;
+}
+
+sub player_action {
+    my $self = shift;
+    my $data = shift;
+    my $player;
+    if ($data->{steam_id}) {
+        $player = Mjollnir::Player->new($self->db, $data->{steam_id});
+    }
+    elsif ($data->{ip}) {
+        $player = Mjollnir::Player->new_by_ip($self->db, $data->{ip});
+    }
+    if ( $data->{name} ) {
+        $player->add_name( $data->{name} );
+    }
+    if ( $data->{ip} ) {
+        $player->add_ip( $data->{ip} );
+    }
+    $player->validate;
+    print join("\t", time, $data->{action}, $player->id, $player->ip, $player->name) . "\n";
 }
 
 1;

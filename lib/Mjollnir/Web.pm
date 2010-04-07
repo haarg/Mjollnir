@@ -5,9 +5,7 @@ use 5.010;
 
 our $VERSION = 0.03;
 
-use POE;
-use POE::Kernel;
-use POE::Component::Server::PSGI;
+use Twiggy::Server;
 use Plack::Request;
 use Plack::MIME;
 use Template;
@@ -15,67 +13,76 @@ use File::ShareDir ();
 use File::Spec;
 use Mjollnir::Player;
 
-sub spawn {
-    my $class = shift;
-    my $listen = shift // '127.0.0.1:28900';
-
-    return POE::Session->create(
-        args => [ $listen ],
-        inline_states => {
-            _start => sub {
-                my ( $heap, $parent, $listen ) = @_[HEAP, SENDER, ARG0];
-                my $web = $class->new( $parent->ID );
-                my $app = sub { $web->run_psgi(@_) };
-                my ($host, $port) = split /:/, $listen;
-                my $server = POE::Component::Server::PSGI->new(
-                    host => $host,
-                    port => $port,
-                );
-                open my $olderr, '>&', STDERR;
-                open STDERR, '>', File::Spec->devnull;
-                $heap->{web_session} = $server->register_service( $app );
-                open STDERR, '>&', $olderr;
-                close $olderr;
-                print "Listening for HTTP connections:\n\t$listen\n";
-            },
-            shutdown => sub {
-                my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-                $kernel->post(delete $heap->{web_session}, 'shutdown');
-                print "Stopping web server.\n";
-                return 1;
-            },
-        },
-    );
-}
-
 sub new {
     my $class    = shift;
-    my $manager  = shift;
-    my $self = bless {
-        manager  => $manager,
-    }, $class;
+    my $options  = (@_ == 1 && ref $_[0]) ? shift : { @_ };
+    my $self = bless {}, $class;
+    my $listen = $options->{listen};
+    if ($listen && !ref $listen) {
+        $listen = [ $listen ];
+    }
+    $self->{listen} = $listen // [ '127.0.0.1:28900' ];
+    $self->{db}     = $options->{db} // die;
     $self->{template} = Template->new(
-        INCLUDE_PATH => File::Spec->catdir(
-            File::ShareDir::dist_dir('Mjollnir'), 'templates'
-        ),
+        INCLUDE_PATH => $self->dir_path('templates'),
         DELIMITER => ( $^O eq 'MSWin32' ? ';' : ':' ),
         FILTERS => {
-            format_name => [ sub {
-                my $context = shift;
-                return sub {
-                    my $name = shift;
-                    my $parts = $self->_segment_name($name);
-                    my $template = $context->template('format_name');
-                    my $output = $context->process($template, {
-                        raw_name => $name,
-                        segments => $parts,
-                    });
-                    return $output;
-                };
-            }, 1],
+            format_name => [ sub { $self->_format_name(@_) }, 1 ],
         },
     );
     return $self;
+}
+
+sub _format_name {
+    my $self = shift;
+    my $context = shift;
+    return sub {
+        my $name = shift;
+        my $parts = $self->_segment_name($name);
+        my $template = $context->template('format_name');
+        my $output = $context->process($template, {
+            raw_name => $name,
+            segments => $parts,
+        });
+        return $output;
+    };
+}
+
+sub file_path {
+    my $self = shift;
+    my $dist_dir = File::ShareDir::dist_dir('Mjollnir');
+    return File::Spec->catfile($dist_dir, @_);
+}
+
+sub dir_path {
+    my $self = shift;
+    my $dist_dir = File::ShareDir::dist_dir('Mjollnir');
+    return File::Spec->catdir($dist_dir, @_);
+}
+
+sub start {
+    my $self = shift;
+    print "Listening for HTTP connections:\n";
+    print "\t$_\n"
+        for @{ $self->{listen} };
+
+    my $server = $self->{server}
+        = Twiggy::Server->new('listen' => $self->{listen});
+    $server->register_service($self->app);
+    return $self;
+}
+
+sub shutdown {
+    my $self = shift;
+    print "Stopping web server.\n";
+    my $server = delete $self->{server};
+    $server->{exit_guard}->end;
+    return;
+}
+
+sub app {
+    my $self = shift;
+    return sub { $self->run_psgi(@_) };
 }
 
 sub run_psgi {
@@ -93,7 +100,7 @@ sub run_psgi {
     if ($self->can($call_method)) {
         return $self->$call_method($req, $data);
     }
-    my $filepath = File::Spec->catfile(File::ShareDir::dist_dir('Mjollnir'), 'templates', $path_info);
+    my $filepath = $self->file_path('templates', $path_info);
     if ( -e $filepath ) {
         my $filename = $path_info;
         $filename =~ s{\A/}{}msx;
@@ -154,11 +161,11 @@ sub www_player {
 
     $player->refresh;
     my $vars = {
-        player  => $player,
+        player          => $player,
         check_banned_ip => sub { $db->check_banned_ip(@_) },
-        param => $param,
+        param           => $param,
     };
-    
+
     if ($param->{unban} && $param->{confirm}) {
         $vars->{unban}{result} = $player->unban;
     }
@@ -248,7 +255,7 @@ sub www_search {
 
 sub db {
     my $self = shift;
-    return POE::Kernel->call( $self->{manager}, 'db' );
+    return $self->{db};
 }
 
 sub process_template {

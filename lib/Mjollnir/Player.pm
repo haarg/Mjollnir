@@ -15,7 +15,7 @@ sub new {
     my $class = shift;
     my $db = shift;
     my $steam_id = lc shift;
-    
+
     my $self = bless {}, $class;
     $self->{steam_id} = $steam_id;
     $self->{db} = $db;
@@ -82,6 +82,18 @@ sub ban {
     return 1;
 }
 
+sub validate {
+    my $self = shift;
+    $self->refresh;
+    if ( $self->is_banned || $self->is_name_banned ) {
+        $self->kick;
+    }
+    elsif ( $self->vac_banned ) {
+        $self->ban('VAC banned');
+    }
+    return;
+}
+
 sub unban {
     my $self = shift;
     my $db   = $self->{db};
@@ -133,9 +145,9 @@ sub add_ip {
     my $self = shift;
     my $ip = shift;
     my $db = $self->{db};
-    
+
     $self->{ip} //= $ip;
-    
+
     $db->do(
         'INSERT OR REPLACE INTO player_ips (steam_id, ip, timestamp) VALUES (?, ?, ?)',
         {}, $self->id, $ip, time
@@ -285,10 +297,10 @@ sub new_by_link {
     my $db = shift;
     my $link = shift;
 
-    if ( $link =~ m{\Ahttp://steamcommunity.com/profiles/(\d+)/}msx ) {
+    if ( $link =~ m{\Ahttp://(?:www\.)?steamcommunity\.com/profiles/(\d+)}msx ) {
         return $class->new_by_community_id($db, $1);
     }
-    elsif ( $link =~ m{\Ahttp://steamcommunity.com/id/([^/]+)/}msx ) {
+    elsif ( $link =~ m{\Ahttp://(?:www\.)?steamcommunity\.com/id/([^/]+)}msx ) {
         my $xml_url = "http://steamcommunity.com/id/$1/?xml=1";
         my $data = $class->_xml_info($xml_url);
         my $player = $class->new_by_community_id($db, $data->{community_id});

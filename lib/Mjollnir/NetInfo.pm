@@ -40,7 +40,7 @@ END_WQL
     my $device;
     while (my ($net) = $sth->fetchrow) {
         if ( grep { $_ eq $ip } @{ $net->{IPAddress} } ) {
-            $device = "\\Device\\NPF_$net->{SettingID}";
+            $device = '\Device\NPF_' . $net->{SettingID};
             last;
         }
     }

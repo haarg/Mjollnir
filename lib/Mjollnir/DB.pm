@@ -23,8 +23,9 @@ sub db_filename {
 
 sub new {
     my $class = shift;
+    my $options  = (@_ == 1 && ref $_[0]) ? shift : { @_ };
 
-    my $db_file = $class->db_filename;
+    my $db_file = $options->{db_file} // $class->db_filename;
     my $create = !-e $db_file;
     my $self = $class->connect( 'dbi:SQLite:' . $db_file, undef, undef, {
         PrintError => 0,
