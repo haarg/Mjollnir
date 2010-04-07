@@ -7,6 +7,7 @@ our $VERSION = 0.03;
 
 use Twiggy::Server;
 use Plack::Request;
+use Plack::App::File;
 use Plack::MIME;
 use Template;
 use File::ShareDir ();
@@ -30,6 +31,7 @@ sub new {
             format_name => [ sub { $self->_format_name(@_) }, 1 ],
         },
     );
+    $self->{file_app} = Plack::App::File->new(root => $self->dir_path('htdocs'))->to_app;
     return $self;
 }
 
@@ -68,7 +70,7 @@ sub start {
 
     my $server = $self->{server}
         = Twiggy::Server->new('listen' => $self->{listen});
-    $server->register_service($self->app);
+    $server->register_service($self->wrapped);
     return $self;
 }
 
@@ -80,7 +82,19 @@ sub shutdown {
     return;
 }
 
-sub app {
+sub wrapped {
+    my $self = shift;
+    my $app = $self->to_app;
+    require Plack::Middleware::ConditionalGET;
+    $app = Plack::Middleware::ConditionalGET->wrap($app);
+    require Plack::Middleware::StackTrace;
+    $app = Plack::Middleware::StackTrace->wrap($app);
+    require Plack::Middleware::AccessLog;
+    $app = Plack::Middleware::AccessLog->wrap($app, format => '[web] %t %h "%r" %>s %b');
+    return $app;
+}
+
+sub to_app {
     my $self = shift;
     return sub { $self->run_psgi(@_) };
 }
@@ -100,23 +114,7 @@ sub run_psgi {
     if ($self->can($call_method)) {
         return $self->$call_method($req, $data);
     }
-    my $filepath = $self->file_path('templates', $path_info);
-    if ( -e $filepath ) {
-        my $filename = $path_info;
-        $filename =~ s{\A/}{}msx;
-        my $vars = { param => $req->parameters };
-        my $mime = Plack::MIME->mime_type($filename) || 'text/plain';
-        if ($mime =~ m{\Atext/}) {
-            $mime .= '; charset=utf-8';
-        }
-        return sub {
-            my $respond = shift;
-            my $writer = $respond->([200, ['Content-Type' => $mime]]);
-            $self->process_template( $filename, $vars, $writer );
-            return;
-        };
-    }
-    return [404, ['Content-Type' => 'text/plain'], ['Not found']];
+    return $self->{file_app}->($env);
 }
 
 sub www_main {
