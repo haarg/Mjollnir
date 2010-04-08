@@ -3,7 +3,6 @@ use Module::Build;
 my $build = Module::Build->new(
     module_name     => 'Mjollnir',
     license         => 'perl',
-    dynamic_config  => 0,
     create_license  => 1,
     share_dir       => 'share',
     requires => {
@@ -33,6 +32,10 @@ my $build = Module::Build->new(
 
         'Twiggy::Server'                => 0,
         'Template'                      => 0,
+        ($^O eq 'MSWin32') ? (
+            'Win32'                         => 0,
+            'Win32::API'                    => 0,
+        ) : (),
     },
     build_requires => {
         'File::Find'                    => 0,
