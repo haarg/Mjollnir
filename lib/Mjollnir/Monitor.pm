@@ -36,10 +36,9 @@ sub start {
     $self->_init_pcap;
 
     my $pcap = $self->{pcap};
-    my $fd = Net::Pcap::fileno($pcap);
-    $self->{io} = AnyEvent->io(
-        fh   => $fd,
-        poll => 'r',
+    $self->{timer} = AnyEvent->timer(
+        wait => 0.2,
+        interval => 0.2,
         cb   => sub {
             my @pending;
             Net::Pcap::dispatch(
@@ -78,7 +77,6 @@ sub _init_pcap {
     $self->{network}     = join( '.', unpack( 'C4', Socket::inet_aton($network) ) );
     $self->{mask}        = 32 - log( 2**32 - $mask ) / log 2;
 
-
     my $filter_string = "udp and dst port 28960 and dst net $network/$mask";
     my $filter;
     # filters are broken
@@ -90,9 +88,9 @@ sub _init_pcap {
 
 sub shutdown {
     my $self = shift;
-    print "Stopping network monitor.\n";
-    delete $self->{io};
+    delete $self->{timer};
     if ($self->{pcap}) {
+        print "Stopping network monitor.\n";
         Net::Pcap::close(delete $self->{pcap});
     }
     if ($self->{filter}) {

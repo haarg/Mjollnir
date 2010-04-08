@@ -76,10 +76,18 @@ sub start {
 
 sub shutdown {
     my $self = shift;
-    print "Stopping web server.\n";
-    my $server = delete $self->{server};
-    $server->{exit_guard}->end;
+    if (my $server = delete $self->{server}) {
+        print "Stopping web server.\n";
+        if ($server->{exit_guard}) {
+            $server->{exit_guard}->end;
+        }
+    }
     return;
+}
+
+sub DESTROY {
+    my $self = shift;
+    $self->shutdown;
 }
 
 sub wrapped {
@@ -89,8 +97,8 @@ sub wrapped {
     $app = Plack::Middleware::ConditionalGET->wrap($app);
     require Plack::Middleware::StackTrace;
     $app = Plack::Middleware::StackTrace->wrap($app);
-    require Plack::Middleware::AccessLog;
-    $app = Plack::Middleware::AccessLog->wrap($app, format => '[web] %t %h "%r" %>s %b');
+#    require Plack::Middleware::AccessLog;
+#    $app = Plack::Middleware::AccessLog->wrap($app, format => '[web] %t %h "%r" %>s %b');
     return $app;
 }
 

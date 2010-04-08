@@ -39,6 +39,9 @@ sub start {
         );
     }
 
+    # this seems to fix catching signals on Windows
+    { my %sig = %SIG }
+
     $self->{net_monitor} = Mjollnir::Monitor->new(
         %{ $self->{config} },
         callback => sub { $self->player_action(@_) },
@@ -58,8 +61,12 @@ sub shutdown {
     my $self = shift;
     print "Shutting down...\n";
     delete $self->{signal_watchers};
-    delete $self->{net_monitor};
-    delete $self->{web_server};
+    if (my $net_monitor = delete $self->{net_monitor}) {
+        $net_monitor->shutdown;
+    }
+    if (my $web_server = delete $self->{web_server}) {
+        $web_server->shutdown;
+    }
     $self->clear_ip_bans;
     $self->{cv}->send;
 }
@@ -94,7 +101,7 @@ sub player_action {
         $player->add_ip( $data->{ip} );
     }
     $player->validate;
-    print join("\t", ('[net] ' . POSIX::strftime "%d/%b/%Y %H:%M:%S", localtime), $data->{action}, $player->id, $player->ip, $player->name) . "\n";
+    print join("\t", POSIX::strftime("[%d/%b/%Y %H:%M:%S]", localtime), $player->id, $player->ip, $player->name) . "\n";
 }
 
 1;
