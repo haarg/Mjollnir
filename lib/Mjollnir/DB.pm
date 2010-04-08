@@ -156,9 +156,9 @@ sub check_banned_name {
     my $self = shift;
     my $name = shift;
 
-    my $match = $self->selectrow_array('SELECT COUNT(*) FROM ? REGEX name_pattern', {}, $name);
+    my $match = $self->selectrow_array('SELECT COUNT(*) FROM name_bans WHERE ? REGEXP name_pattern', {}, $name);
 
-    return;
+    return $match;
 }
 
 1;
