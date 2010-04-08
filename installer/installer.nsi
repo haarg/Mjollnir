@@ -1,5 +1,6 @@
 !tempfile DISTPARAM
 !system 'cd .. && Build.bat distclean'
+!delfile ..\MANIFEST
 !system 'cd .. && perl Build.PL'
 !system 'cd .. && Build.bat manifest'
 !system 'cd .. && Build.bat distdir'
@@ -70,18 +71,32 @@ Section ""
     File /r ${DISTDIR}\*.*
 
     ${If} $install_ipseccmd == 1
+        DetailPrint "Installing Windows XP SP2 Support Tools..."
         ExecWait '"$PLUGINSDIR\WindowsXP-KB838079-SupportTools-ENU.exe" /Q /C:"msiexec.exe /qb /i suptools.msi REBOOT=ReallySuppress ADDLOCAL=ALL"'
     ${EndIf}
     ${If} $install_perl == 1
+        DetailPrint "Installing Strawberry Perl..."
         ExecWait 'msiexec.exe /qb /i "$PLUGINSDIR\strawberry-perl-5.10.1.1.msi"'
         ReadEnvStr $R0 "PATH"
         StrCpy $R0 "C:\strawberry\c\bin;C:\strawberry\perl\bin;$R0"
         System::Call 'Kernel32::SetEnvironmentVariableA(t, t) i("PATH", R0).r0'
     ${EndIf}
-    ExecWait '"$PLUGINSDIR\winpcap-nmap-4.11.exe" /S'
-    nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe C:\strawberry\perl\bin\ppm.pl install Net::Pcap'
-    nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe -MCPAN -e notest(@ARGV) install .'
 
-    SetOutDir $SYSDIR
-    CreateShortcut "$DESKTOP\Mjollnir.lnk" C:\strawberry\perl\bin\perl.exe "C:\strawberry\perl\bin\mjollnir.pl --respawn" "$SYSDIR\shell32.dll" 10
+    DetailPrint "Installing WinPcap..."
+    ExecWait '"$PLUGINSDIR\winpcap-nmap-4.11.exe" /S'
+
+    StrCpy $R0 $PLUGINSDIR\.cpanm
+    System::Call 'Kernel32::SetEnvironmentVariableA(t, t) i("PERL_CPANM_HOME", R0).r0'
+    File C:\strawberry\perl\bin\cpanm
+
+    DetailPrint "Installing CPAN Prerequisites..."
+    nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe C:\strawberry\perl\bin\ppm.pl install Net::Pcap'
+
+    nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe cpanm -n EV'
+    nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe cpanm -n --installdeps .'
+    DetailPrint "Installing Mjollnir..."
+    nsExec::ExecToLog 'C:\strawberry\perl\bin\perl.exe cpanm -n .'
+
+    SetOutPath $SYSDIR
+    CreateShortcut "$DESKTOP\Mjollnir.lnk" C:\strawberry\perl\bin\perl.exe C:\strawberry\perl\bin\mjollnir.pl "$SYSDIR\shell32.dll" 10
 SectionEnd
