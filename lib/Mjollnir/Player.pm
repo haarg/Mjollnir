@@ -303,6 +303,8 @@ sub new_by_link {
     elsif ( $link =~ m{\Ahttp://(?:www\.)?steamcommunity\.com/id/([^/]+)}msx ) {
         my $xml_url = "http://steamcommunity.com/id/$1/?xml=1";
         my $data = $class->_xml_info($xml_url);
+        return
+            if !$data->{community_id};
         my $player = $class->new_by_community_id($db, $data->{community_id});
         if ($player && $data->{player_name}) {
             $player->add_name( $data->{player_name} );
@@ -321,10 +323,20 @@ sub _xml_info {
     $ua->timeout(10);
     my $response = $ua->get($url);
     my $xml = XML::LibXML->load_xml(string => $response->content);
+    my $get_tag = sub {
+        my $element = $xml->getElementsByTagName(shift);
+        return undef
+            unless $element;
+        $element = $element->[0];
+        return undef
+            unless $element;
+        $element = $element->textContent;
+        return $element;
+    };
     return {
-        player_name => $xml->getElementsByTagName('steamID')->[0]->textContent,
-        community_id => $xml->getElementsByTagName('steamID64')->[0]->textContent,
-        vac_banned => $xml->getElementsByTagName('vacBanned')->[0]->textContent ? 1 : 0,
+        player_name => $get_tag->('steamID'),
+        community_id => $get_tag->('steamID64'),
+        vac_banned => $get_tag->('vacBanned') ? 1 : 0,
     };
 }
 
@@ -454,3 +466,23 @@ sub find_banned {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Mjollnir::Player - Player object for Mjollnir
+
+=head1 AUTHOR
+
+Graham Knop <haarg@haarg.org>
+
+=head1 LICENSE
+
+Copyright (c) 2010, Graham Knop
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl 5.10.0. For more details, see the
+full text of the licenses in the directory LICENSES.
+
+=cut

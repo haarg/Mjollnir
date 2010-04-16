@@ -25,13 +25,14 @@ sub new {
     my $self = bless {}, $class;
     $self->{callback} = $options->{callback} // sub {};
     $self->{device}   = $options->{device} // $self->detect_default_device;
+    $self->{logger}   = $options->{logger};
     return $self;
 }
 
 sub start {
     my $self = shift;
 
-    print "Monitoring network device:\n\t$self->{device}\n";
+    $self->{logger}->("Monitoring network device:\n\t$self->{device}\n");
 
     $self->_init_pcap;
 
@@ -90,7 +91,7 @@ sub shutdown {
     my $self = shift;
     delete $self->{timer};
     if ($self->{pcap}) {
-        print "Stopping network monitor.\n";
+        $self->{logger}->("Stopping network monitor.\n");
         Net::Pcap::close(delete $self->{pcap});
     }
     if ($self->{filter}) {

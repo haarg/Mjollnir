@@ -18,6 +18,7 @@ sub new {
     my $class    = shift;
     my $options  = (@_ == 1 && ref $_[0]) ? shift : { @_ };
     my $self = bless {}, $class;
+    $self->{logger} = $options->{logger};
     my $listen = $options->{listen};
     if ($listen && !ref $listen) {
         $listen = [ $listen ];
@@ -64,8 +65,8 @@ sub dir_path {
 
 sub start {
     my $self = shift;
-    print "Listening for HTTP connections:\n";
-    print "\t$_\n"
+    $self->{logger}->("Listening for HTTP connections:\n");
+    $self->{logger}->("\t$_\n")
         for @{ $self->{listen} };
 
     my $server = $self->{server}
@@ -77,7 +78,7 @@ sub start {
 sub shutdown {
     my $self = shift;
     if (my $server = delete $self->{server}) {
-        print "Stopping web server.\n";
+        $self->{logger}->("Stopping web server.\n");
         if ($server->{exit_guard}) {
             $server->{exit_guard}->end;
         }

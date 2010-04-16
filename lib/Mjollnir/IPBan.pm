@@ -3,7 +3,8 @@ use strict;
 use warnings;
 
 our $IMPL;
-BEGIN {
+
+sub import {
     if (! $IMPL) {
         if ($ENV{MJOL_DEBUG}) {
             $IMPL = 'Mjollnir::IPBan::Debug';
@@ -13,9 +14,11 @@ BEGIN {
             my (undef, $major, $minor, $build) = Win32::GetOSVersion();
             my $version = sprintf '%d.%03d', $major, $minor;
             if ($version == 5.001) {
+                # Windows XP
                 $IMPL = 'Mjollnir::IPBan::ipseccmd';
             }
             elsif ($version > 5.001) {
+                # Windows Vista+
                 $IMPL = 'Mjollnir::IPBan::netsh';
             }
         }

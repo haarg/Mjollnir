@@ -29,7 +29,7 @@ sub run {
 
 sub start {
     my $self = shift;
-    print "Starting Mjollnir...\n";
+    $self->logger->("Starting Mjollnir...\n");
 
     $self->{signal_watchers} = {};
     for my $sig (qw(INT QUIT TERM HUP)) {
@@ -45,10 +45,12 @@ sub start {
     $self->{net_monitor} = Mjollnir::Monitor->new(
         %{ $self->{config} },
         callback => sub { $self->player_action(@_) },
+        logger   => $self->logger,
     )->start;
     $self->{web_server} = Mjollnir::Web->new(
         %{ $self->{config} },
-        db => $self->db,
+        db      => $self->db,
+        logger  => $self->logger,
     )->start;
 
     $self->clear_ip_bans;
@@ -59,7 +61,7 @@ sub start {
 
 sub shutdown {
     my $self = shift;
-    print "Shutting down...\n";
+    $self->logger->("Shutting down...\n");
     delete $self->{signal_watchers};
     if (my $net_monitor = delete $self->{net_monitor}) {
         $net_monitor->shutdown;
@@ -73,8 +75,17 @@ sub shutdown {
 
 sub db {
     my $self = shift;
-    $self->{db} ||= Mjollnir::DB->new($self->{config});
+    $self->{db} ||= Mjollnir::DB->new(
+        %{ $self->{config} },
+        logger => $self->logger,
+    );
     return $self->{db};
+}
+
+sub logger {
+    my $self = shift;
+    $self->{logger} ||= sub { print @_ };
+    return $self->{logger};
 }
 
 sub clear_ip_bans {
@@ -101,7 +112,7 @@ sub player_action {
         $player->add_ip( $data->{ip} );
     }
     $player->validate;
-    print join("\t", POSIX::strftime("[%d/%b/%Y %H:%M:%S]", localtime), $player->id, $player->ip, $player->name) . "\n";
+    $self->logger->(sprintf "[%s] %s %-15s %s\n", POSIX::strftime('%d/%m/%y %H:%M:%S', localtime), $player->id, $player->ip, $player->name);
 }
 
 1;

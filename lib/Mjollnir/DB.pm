@@ -50,7 +50,7 @@ sub new {
                 if (!-e $sql_script && !-e $pl_script) {
                     die "Impossible to perform schema upgrade!\n";
                 }
-                print "Upgrading DB Schema to version $next_step...\n";
+                $self->{logger}->("Upgrading DB Schema to version $next_step...\n");
                 if (-e $sql_script) {
                     $self->_run_sql_script($sql_script);
                 }
