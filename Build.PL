@@ -11,7 +11,7 @@ my $build = Module::Build->new(
         'File::ShareDir'                => 0,
         'File::Spec'                    => 0,
 
-        'AnyEvent'                      => 0,
+        'AnyEvent'                      => 5.26,
 
         'DBI'                           => 0,
         'DBD::SQLite'                   => 0,
@@ -23,6 +23,7 @@ my $build = Module::Build->new(
         'NetPacket::IP'                 => 0,
         'NetPacket::UDP'                => 0,
 
+        'Plack'                         => 0.9930,
         'Plack::Request'                => 0,
         'Plack::MIME'                   => 0,
         'Plack::App::File'              => 0,
@@ -30,6 +31,7 @@ my $build = Module::Build->new(
         'Plack::Middleware::StackTrace' => 0,
         'Plack::Middleware::AccessLog'  => 0,
 
+        'Twiggy'                        => 0.1005,
         'Twiggy::Server'                => 0,
         'Template'                      => 0,
         ($^O eq 'MSWin32') ? (
