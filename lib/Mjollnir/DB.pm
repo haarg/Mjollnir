@@ -6,6 +6,8 @@ use 5.010;
 our $VERSION = 0.03;
 
 use File::ShareDir ();
+use File::HomeDir  ();
+use File::Path     ();
 use File::Spec     ();
 use DBI;
 use DBD::SQLite;
@@ -16,8 +18,8 @@ use constant DB_SCHEMA_VERSION => 7;
 @Mjollnir::DB::st::ISA = qw(DBI::st);
 
 sub db_filename {
-    my $data_dir = File::ShareDir::dist_dir('Mjollnir');
-    my $db_file  = File::Spec->catfile( $data_dir, 'mjollnir.db' );
+    my $data_dir = File::HomeDir->my_data('Mjollnir');
+    my $db_file  = File::Spec->catfile( $data_dir, '.mjollnir', 'mjollnir.db' );
     return $db_file;
 }
 
@@ -27,6 +29,20 @@ sub new {
 
     my $db_file = $options->{db_file} // $class->db_filename;
     my $create = !-e $db_file;
+    if ($create) {
+        my $dir = File::Spec->catpath((File::Spec->splitpath($db_file))[0,1], '');
+        if (! -e $dir) {
+            File::Path::make_path($dir);
+        }
+        my $data_dir = File::ShareDir::dist_dir('Mjollnir');
+        my $old_db_file  = File::Spec->catfile( $data_dir, 'mjollnir.db' );
+        if (-e $old_db_file) {
+            require File::Copy;
+            File::Copy::move($old_db_file, $db_file);
+            chmod 0644, $db_file;
+            $create = 0;
+        }
+    }
     my $self = $class->connect( 'dbi:SQLite:' . $db_file, undef, undef, {
         PrintError => 0,
         RaiseError => 1,

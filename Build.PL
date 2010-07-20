@@ -8,6 +8,7 @@ my $build = Module::Build->new(
     requires => {
         'perl'                          => 5.010,
         'Cwd'                           => 0,
+        'File::HomeDir'                 => 0,
         'File::ShareDir'                => 0,
         'File::Spec'                    => 0,
 
