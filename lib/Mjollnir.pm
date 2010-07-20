@@ -39,7 +39,7 @@ sub start {
         );
     }
 
-    # this seems to fix catching signals on Windows
+    # this seems to fix catching signals on Windows, at least in some cases
     { my %sig = %SIG }
 
     $self->{net_monitor} = Mjollnir::Monitor->new(
