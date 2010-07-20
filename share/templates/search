@@ -1,4 +1,4 @@
-[%- PROCESS header -%]
+[%- WRAPPER main_wrapper -%]
 <h1>Search - [% param.q | html %]</h1>
 [%- IF players.size -%]
     <ul>
@@ -9,4 +9,4 @@
 [%- ELSE -%]
     <h2>None found.</h2>
 [%- END -%]
-[%- PROCESS footer -%]
+[%- END -%]

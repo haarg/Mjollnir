@@ -1,4 +1,4 @@
-[%- PROCESS header -%]
+[%- WRAPPER main_wrapper -%]
     <h1>Mjöllnir - Player Info - [% player.id %]</h1>
     [%- IF param.unban -%]
         <div class="unban-header">
@@ -44,4 +44,4 @@
         <li>[% ip %][% IF check_banned_ip(ip); " - Banned"; END %]</li>
     [%- END -%]
     </ul>
-[%- PROCESS footer -%]
+[%- END -%]

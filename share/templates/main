@@ -1,4 +1,4 @@
-[%- PROCESS header -%]
+[%- WRAPPER main_wrapper -%]
         <h1>Mjöllnir</h1>
     [%- IF param.kick; PROCESS kick_header; END -%]
     [%- PROCESS player_list -%]
@@ -9,4 +9,4 @@
             }, 20000);
         </script>
     [%- END -%]
-[%- PROCESS footer -%]
+[%- END -%]
