@@ -10,6 +10,7 @@ use Mjollnir::IPBan;
 use LWP::UserAgent;
 use XML::LibXML;
 use Math::BigInt;
+use AnyEvent::HTTP;
 
 sub new {
     my $class = shift;
@@ -316,13 +317,49 @@ sub new_by_link {
     return;
 }
 
+sub new_by_link_cb {
+    my $class = shift;
+    my $db = shift;
+    my $link = shift;
+    my $cb = shift;
+
+    if ( $link =~ m{\Ahttp://(?:www\.)?steamcommunity\.com/profiles/(\d+)}msx ) {
+        $cb->($class->new_by_community_id($db, $1));
+        return;
+    }
+    elsif ( $link =~ m{\Ahttp://(?:www\.)?steamcommunity\.com/id/([^/]+)}msx ) {
+        my $xml_url = "http://steamcommunity.com/id/$1/?xml=1";
+        http_get $xml_url, sub {
+            my ($body, $hdr) = @_;
+            my $data = $class->_xml_parse($body);
+            return
+                if !$data->{community_id};
+            my $player = $class->new_by_community_id($db, $data->{community_id});
+            if ($player && $data->{player_name}) {
+                $player->add_name( $data->{player_name} );
+            }
+            $player->vac_banned($data->{vac_banned});
+            $player->updated(time);
+            $cb->($player);
+        };
+    }
+    return;
+}
+
+
 sub _xml_info {
     my $class = shift;
     my $url = shift;
     my $ua = LWP::UserAgent->new;
     $ua->timeout(10);
     my $response = $ua->get($url);
-    my $xml = XML::LibXML->load_xml(string => $response->content);
+    return $class->_xml_parse($response->content);
+}
+
+sub _xml_parse {
+    my $class = shift;
+    my $data = shift;
+    my $xml = XML::LibXML->load_xml(string => $data);
     my $get_tag = sub {
         my $element = $xml->getElementsByTagName(shift);
         return undef

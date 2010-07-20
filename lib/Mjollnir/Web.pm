@@ -226,7 +226,12 @@ sub www_search {
         my $db = $self->db;
         my $player;
         if ( $search =~ m{\Ahttp://(?:www\.)?steamcommunity.com/}msx ) {
-            $player = Mjollnir::Player->new_by_link($db, $search);
+            Mjollnir::Player->new_by_link_cb($db, $search, sub {
+                my $player = shift;
+                $res->redirect($req->base . 'player/' . $player->id);
+                $respond->($res->finalize);
+            });
+            return;
         }
         elsif ( $search =~ /\A[0-9a-zA-Z]{16}\z/ ) {
             $player = Mjollnir::Player->new($db, $search);
